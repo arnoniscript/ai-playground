@@ -1,0 +1,293 @@
+ai-marisa-playground/
+│
+├── 📋 README.md                          # Overview do projeto
+├── 📋 QUICKSTART.md                      # Guia de início rápido (5 min)
+├── 📋 IMPLEMENTATION_SUMMARY.md           # Este documento - resumo completo
+├── .gitignore
+├── setup.sh                              # Script de setup automático
+│
+├── 📁 backend/                           # Node.js + Express (REST API)
+│   ├── src/
+│   │   ├── main.ts                       # Servidor Express - entry point
+│   │   ├── config.ts                     # Configurações (env vars)
+│   │   ├── types.ts                      # Tipos TypeScript compartilhados
+│   │   │
+│   │   ├── 📁 db/
+│   │   │   └── client.ts                 # Cliente Supabase iniciado
+│   │   │
+│   │   ├── 📁 middleware/
+│   │   │   ├── auth.ts                   # Autenticação + RBAC
+│   │   │   │   └── authMiddleware()      # Valida JWT
+│   │   │   │   └── adminOnly()           # Restrição admin
+│   │   │   │   └── testerOnly()          # Restrição tester
+│   │   │   └── errorHandler.ts           # Tratamento de erros central
+│   │   │
+│   │   ├── 📁 routes/
+│   │   │   ├── auth.ts                   # POST /auth/signup, /verify, /logout
+│   │   │   ├── admin.ts                  # GET/POST/PUT/DELETE /admin/playgrounds
+│   │   │   │   └── /admin/playgrounds/:id/metrics
+│   │   │   └── playgrounds.ts            # GET /playgrounds, POST evaluations
+│   │   │       └── GET /playgrounds/:id/next-model
+│   │   │       └── GET /playgrounds/:id/progress
+│   │   │
+│   │   ├── 📁 schemas/
+│   │   │   └── index.ts                  # Validações Zod para requests
+│   │   │       ├── SignupRequestSchema
+│   │   │       ├── VerifyOTPSchema
+│   │   │       ├── CreatePlaygroundSchema
+│   │   │       └── SubmitEvaluationSchema
+│   │   │
+│   │   └── 📁 utils/
+│   │       └── auth.ts                   # Utilidades de autenticação
+│   │           ├── generateToken()
+│   │           ├── verifyToken()
+│   │           ├── validateEmailDomain()
+│   │           └── generateOTP()
+│   │
+│   ├── package.json                      # Dependências Node.js
+│   ├── tsconfig.json                     # Configuração TypeScript
+│   ├── .env.example                      # Template de variáveis
+│   │   ├── SUPABASE_URL
+│   │   ├── SUPABASE_SERVICE_KEY
+│   │   ├── JWT_SECRET
+│   │   ├── ALLOWED_EMAIL_DOMAIN
+│   │   ├── PORT
+│   │   ├── NODE_ENV
+│   │   └── CORS_ORIGIN
+│   │
+│   └── dist/                             # Compilado (npm run build)
+│
+├── 📁 frontend/                          # Next.js 14 + React 18
+│   ├── app/                              # Páginas Next.js (App Router)
+│   │   ├── page.tsx                      # / - Home page
+│   │   ├── layout.tsx                    # Layout raiz
+│   │   ├── globals.css                   # Estilos Tailwind
+│   │   │
+│   │   ├── 📁 login/
+│   │   │   └── page.tsx                  # /login - Login com OTP
+│   │   │
+│   │   ├── 📁 dashboard/
+│   │   │   └── page.tsx                  # /dashboard - Dashboard tester
+│   │   │
+│   │   └── 📁 admin/
+│   │       └── 📁 dashboard/
+│   │           └── page.tsx              # /admin/dashboard - Admin
+│   │
+│   ├── components/                       # Componentes reutilizáveis
+│   │   ├── login-form.tsx                # Formulário OTP
+│   │   ├── layout.tsx                    # Layout com navbar
+│   │   └── auth-guard.tsx                # Proteção de rotas (AuthGuard, AdminGuard)
+│   │
+│   ├── lib/                              # Lógica compartilhada
+│   │   ├── api.ts                        # Cliente Axios com interceptors
+│   │   ├── auth-store.ts                 # Store Zustand para auth
+│   │   │   └── useAuthStore()
+│   │   │       ├── user
+│   │   │       ├── token
+│   │   │       ├── setAuth()
+│   │   │       ├── logout()
+│   │   │       ├── isAuthenticated()
+│   │   │       └── isAdmin()
+│   │   └── types.ts                      # Tipos TypeScript
+│   │       ├── User
+│   │       ├── Playground
+│   │       ├── Question
+│   │       └── Evaluation
+│   │
+│   ├── package.json                      # Dependências React/Next
+│   ├── tsconfig.json                     # Configuração TypeScript
+│   ├── next.config.js                    # Config Next.js
+│   ├── tailwind.config.ts                # Config Tailwind CSS
+│   ├── postcss.config.js                 # Config PostCSS
+│   ├── .env.example                      # Template de variáveis
+│   │   ├── NEXT_PUBLIC_API_URL
+│   │   ├── NEXT_PUBLIC_SUPABASE_URL
+│   │   └── NEXT_PUBLIC_SUPABASE_ANON_KEY
+│   │
+│   └── .next/                            # Build output (npm run build)
+│
+├── 📁 supabase/                          # Configuração Supabase
+│   └── 📁 migrations/
+│       └── 001_initial_schema.sql        # Schema PostgreSQL completo
+│           ├── CREATE TABLE users
+│           ├── CREATE TABLE playgrounds
+│           ├── CREATE TABLE model_configurations
+│           ├── CREATE TABLE evaluation_counters
+│           ├── CREATE TABLE questions
+│           ├── CREATE TABLE evaluations
+│           ├── CREATE TABLE audit_log
+│           ├── CREATE VIEW playground_metrics
+│           ├── CREATE VIEW question_metrics
+│           ├── CREATE VIEW open_responses
+│           ├── RLS Policies
+│           └── Triggers (updated_at)
+│
+├── 📁 docs/                              # Documentação completa
+│   ├── 📋 database-schema.md             # Estrutura do banco (tabelas, views, índices)
+│   ├── 📋 api-endpoints.md               # Todos os endpoints com exemplos JSON
+│   ├── 📋 auth-flow.md                   # Fluxo de autenticação OTP
+│   ├── 📋 setup-deployment.md            # Setup local e deploy produção
+│   └── 📋 TODO.md                        # Funcionalidades pendentes (priorizado)
+│
+└── .env files (não versionados)
+    ├── backend/.env.local
+    └── frontend/.env.local
+
+═══════════════════════════════════════════════════════════════════════════════
+
+RESUMO DE ARQUIVOS
+
+Backend (Node.js):
+  ├── 1 entry point (main.ts)
+  ├── 3 rotas (auth, admin, playgrounds)
+  ├── 3 middleware (auth, errorHandler)
+  ├── 1 schemas (validações Zod)
+  └── Total: ~1000 linhas de código TypeScript
+
+Frontend (Next.js):
+  ├── 5 páginas
+  ├── 3 componentes
+  ├── 3 libs/utilities
+  └── Total: ~800 linhas de código TypeScript/TSX
+
+Database:
+  ├── 7 tabelas
+  ├── 3 views
+  ├── 4 enums
+  ├── Índices performance
+  ├── RLS policies
+  └── Total: ~400 linhas SQL
+
+Documentação:
+  ├── 7 arquivos markdown
+  ├── ~2000 linhas
+  └── Tudo documentado
+
+═══════════════════════════════════════════════════════════════════════════════
+
+FEATURES IMPLEMENTADAS
+
+Autenticação:
+  ✅ Email + OTP (6 dígitos)
+  ✅ Validação domínio @marisa.care
+  ✅ JWT tokens (7 dias)
+  ✅ Roles (admin, tester)
+  ✅ RBAC (role-based access control)
+
+Playgrounds:
+  ✅ Tipo A/B Testing
+  ✅ Tipo Tuning
+  ✅ Perguntas customizadas (select, input_string)
+  ✅ Limite de avaliações por modelo
+  ✅ Restrição por email (opcional)
+  ✅ Suporte a HTML (support_text)
+
+Avaliações:
+  ✅ Sorteio aleatório A/B
+  ✅ Validação de limites
+  ✅ Session ID para agrupar respostas
+  ✅ Contadores atômicos
+
+Banco de Dados:
+  ✅ PostgreSQL (Supabase)
+  ✅ 7 tabelas + 3 views
+  ✅ Índices performance
+  ✅ RLS policies (segurança)
+  ✅ Triggers (updated_at)
+
+API:
+  ✅ 10+ endpoints REST
+  ✅ Validação Zod
+  ✅ Tratamento erros centralizado
+  ✅ CORS configurável
+
+Frontend:
+  ✅ TypeScript + React 18
+  ✅ Tailwind CSS
+  ✅ Zustand state management
+  ✅ Auth guards
+  ✅ API client com interceptors
+
+═══════════════════════════════════════════════════════════════════════════════
+
+PRÓXIMOS PASSOS RECOMENDADOS (por prioridade)
+
+1️⃣  Componentes Dinâmicos (Semana 1)
+   - Formulário de avaliação (questões dinâmicas)
+   - Renderização de modelo (Eleven Labs embed)
+   - Página de avaliação completa
+
+2️⃣  Dashboard Admin (Semana 2)
+   - Gráficos com Recharts
+   - Tabela de respostas
+   - Exportação CSV
+
+3️⃣  Builder UI (Semana 3)
+   - Criar playground (form)
+   - Adicionar modelos
+   - Editor de perguntas (drag-drop)
+
+4️⃣  Produção (Semana 4)
+   - Email real (SendGrid)
+   - Rate limiting
+   - Deploy Vercel
+   - CI/CD GitHub Actions
+
+Ver docs/TODO.md para todos os detalhes.
+
+═══════════════════════════════════════════════════════════════════════════════
+
+COMO USAR AGORA
+
+Local (Development):
+  $ bash setup.sh
+  $ cd backend && npm run dev    # Terminal 1, porta 3001
+  $ cd frontend && npm run dev   # Terminal 2, porta 3000
+  
+  → http://localhost:3000 (frontend)
+  → Login com teste@marisa.care
+  → OTP nos logs do backend
+
+Produção:
+  → Deploy backend para Vercel Functions
+  → Deploy frontend para Vercel
+  → Database Supabase (já em produção)
+  → Ver docs/setup-deployment.md
+
+═══════════════════════════════════════════════════════════════════════════════
+
+NOTAS IMPORTANTES
+
+✅ Pronto para:
+  - Adicionar componentes (formulário, gráficos)
+  - Deploy em produção
+  - Expansão com novos recursos
+  - Testes e melhorias
+
+⚠️  Ainda Não Implementado:
+  - UI dos formulários dinâmicos
+  - Gráficos de métricas
+  - Email real para OTP
+  - Rate limiting
+  - Componentes avançados
+
+🔐 Segurança:
+  - RLS policies no banco
+  - RBAC no backend
+  - Validação em 2 camadas (Zod + DB)
+  - JWT com expiração
+
+📈 Escalabilidade:
+  - OTP em memória → fácil migrar para Redis
+  - Pronto para horizontal scaling
+  - Queries otimizadas com índices
+
+═══════════════════════════════════════════════════════════════════════════════
+
+STATUS: ✅ MVP COMPLETO
+
+Toda a arquitetura base está implementada e pronta para:
+  1. Componentes visuais (formulários, dashboards)
+  2. Funcionalidades avançadas (email, analytics)
+  3. Deployment em produção
+

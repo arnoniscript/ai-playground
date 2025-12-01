@@ -1,0 +1,62 @@
+🗄️ EXECUTAR MIGRATIONS DO SUPABASE
+
+═══════════════════════════════════════════════════════════════════════
+
+RÁPIDO (Opção Recomendada):
+
+$ ./setup-supabase.sh
+
+Então escolha a opção 1 (Supabase CLI) ou 2 (Manual via Web)
+
+═══════════════════════════════════════════════════════════════════════
+
+OU MANUAL (Opção 2 - Mais Simples):
+
+1. Acesse: https://app.supabase.com
+2. Selecione seu projeto
+3. Vá em "SQL Editor" (menu esquerdo)
+4. Clique "New Query"
+5. Abra o arquivo: supabase/migrations/001_initial_schema.sql
+6. Copie TODO o conteúdo
+7. Cole no SQL Editor
+8. Clique "Run"
+
+═══════════════════════════════════════════════════════════════════════
+
+VERIFICAR SE DEUS CERTO:
+
+Vá em: https://app.supabase.com/project/SEU_PROJECT_ID/editor
+
+Você deve ver essas tabelas:
+   ✓ users
+   ✓ playgrounds
+   ✓ model_configurations
+   ✓ evaluation_counters
+   ✓ questions
+   ✓ evaluations
+   ✓ audit_log
+
+E essas views:
+   ✓ playground_metrics
+   ✓ question_metrics
+   ✓ open_responses
+
+═══════════════════════════════════════════════════════════════════════
+
+DEPOIS DE MIGRAR:
+
+1. Criar um usuário de teste (Admin):
+   
+   Vá em SQL Editor e execute:
+   
+   INSERT INTO users (email, full_name, role)
+   VALUES ('admin@marisa.care', 'Administrador', 'admin');
+
+2. Criar outro usuário para testes (Tester):
+   
+   INSERT INTO users (email, full_name, role)
+   VALUES ('tester@marisa.care', 'Testador', 'tester');
+
+3. Agora, inicie os servidores e acesse http://localhost:3000
+
+═══════════════════════════════════════════════════════════════════════
