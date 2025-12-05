@@ -48,7 +48,11 @@ router.post('/signup', asyncHandler(async (req: Request, res: Response) => {
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error('Error creating user:', error);
+      res.status(500).json({ error: 'Failed to create user' });
+      return;
+    }
     user.data = newUser;
   }
 

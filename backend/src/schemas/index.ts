@@ -36,7 +36,9 @@ export const CreatePlaygroundSchema = z.object({
   })),
 });
 
-export const UpdatePlaygroundSchema = CreatePlaygroundSchema.partial();
+export const UpdatePlaygroundSchema = CreatePlaygroundSchema.partial().extend({
+  is_active: z.boolean().optional(),
+});
 
 // Evaluation Schemas
 export const SubmitEvaluationSchema = z.object({

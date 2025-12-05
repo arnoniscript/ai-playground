@@ -53,6 +53,33 @@ interface OpenResponse {
   created_at: string;
 }
 
+interface EvaluationItem {
+  session_id: string;
+  user_id: string;
+  user_email: string;
+  user_name: string | null;
+  model_key: string;
+  created_at: string;
+  evaluation_count: number;
+}
+
+interface EvaluationDetail {
+  session_id: string;
+  user_email: string;
+  user_name: string | null;
+  model_key: string;
+  created_at: string;
+  responses: {
+    question_id: string;
+    question_text: string;
+    question_type: string;
+    answer_text: string | null;
+    answer_value: string | null;
+    answer_label: string | null;
+    rating: number | null;
+  }[];
+}
+
 const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042", "#8884D8"];
 
 export default function PlaygroundMetricsPage() {
@@ -63,6 +90,10 @@ export default function PlaygroundMetricsPage() {
   const [metrics, setMetrics] = useState<PlaygroundMetrics | null>(null);
   const [questionMetrics, setQuestionMetrics] = useState<QuestionMetrics[]>([]);
   const [openResponses, setOpenResponses] = useState<OpenResponse[]>([]);
+  const [evaluationsList, setEvaluationsList] = useState<EvaluationItem[]>([]);
+  const [selectedEvaluation, setSelectedEvaluation] =
+    useState<EvaluationDetail | null>(null);
+  const [loadingDetails, setLoadingDetails] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -105,12 +136,27 @@ export default function PlaygroundMetricsPage() {
       };
 
       setMetrics(playgroundMetrics);
-      setQuestionMetrics(data.selectMetrics || []);
+      setQuestionMetrics(data.questionMetrics || []);
       setOpenResponses(data.openResponses || []);
+      setEvaluationsList(data.evaluationsList || []);
     } catch (err: any) {
       setError(err.response?.data?.error || "Erro ao carregar métricas");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchEvaluationDetails = async (sessionId: string) => {
+    try {
+      setLoadingDetails(true);
+      const response = await api.get(
+        `/admin/playgrounds/${playgroundId}/evaluations/${sessionId}`
+      );
+      setSelectedEvaluation(response.data.data);
+    } catch (err: any) {
+      console.error("Failed to fetch evaluation details:", err);
+    } finally {
+      setLoadingDetails(false);
     }
   };
 
@@ -349,7 +395,7 @@ export default function PlaygroundMetricsPage() {
 
           {/* Open Responses */}
           {openResponses.length > 0 && (
-            <section className="bg-white border rounded-lg p-6">
+            <section className="bg-white border rounded-lg p-6 mb-8">
               <h2 className="text-xl font-semibold mb-4">
                 Respostas Abertas ({openResponses.length})
               </h2>
@@ -403,6 +449,173 @@ export default function PlaygroundMetricsPage() {
                 </p>
               )}
             </section>
+          )}
+
+          {/* Individual Evaluations */}
+          {evaluationsList.length > 0 && (
+            <section className="bg-white border rounded-lg p-6 mb-8">
+              <h2 className="text-xl font-semibold mb-4">
+                Avaliações Individuais ({evaluationsList.length})
+              </h2>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b bg-gray-50">
+                      <th className="text-left py-3 px-4">Usuário</th>
+                      <th className="text-left py-3 px-4">Modelo</th>
+                      <th className="text-left py-3 px-4">Data</th>
+                      <th className="text-left py-3 px-4">Respostas</th>
+                      <th className="text-left py-3 px-4">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {evaluationsList.map((evaluation) => (
+                      <tr
+                        key={evaluation.session_id}
+                        className="border-b last:border-0 hover:bg-gray-50"
+                      >
+                        <td className="py-3 px-4">
+                          <div>
+                            <div className="font-medium">
+                              {evaluation.user_name || evaluation.user_email}
+                            </div>
+                            {evaluation.user_name && (
+                              <div className="text-xs text-gray-500">
+                                {evaluation.user_email}
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                        <td className="py-3 px-4">{evaluation.model_key}</td>
+                        <td className="py-3 px-4 whitespace-nowrap">
+                          {new Date(evaluation.created_at).toLocaleDateString(
+                            "pt-BR",
+                            {
+                              day: "2-digit",
+                              month: "2-digit",
+                              year: "numeric",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            }
+                          )}
+                        </td>
+                        <td className="py-3 px-4">
+                          {evaluation.evaluation_count} respostas
+                        </td>
+                        <td className="py-3 px-4">
+                          <button
+                            onClick={() =>
+                              fetchEvaluationDetails(evaluation.session_id)
+                            }
+                            className="text-blue-600 hover:text-blue-800 font-medium"
+                          >
+                            Ver Detalhes
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          )}
+
+          {/* Evaluation Details Modal */}
+          {selectedEvaluation && (
+            <div
+              className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+              onClick={() => setSelectedEvaluation(null)}
+            >
+              <div
+                className="bg-white rounded-lg max-w-3xl w-full max-h-[90vh] overflow-y-auto"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="p-6">
+                  <div className="flex justify-between items-start mb-6">
+                    <div>
+                      <h2 className="text-2xl font-bold mb-2">
+                        Detalhes da Avaliação
+                      </h2>
+                      <div className="text-sm text-gray-600 space-y-1">
+                        <p>
+                          <strong>Usuário:</strong>{" "}
+                          {selectedEvaluation.user_name ||
+                            selectedEvaluation.user_email}
+                        </p>
+                        {selectedEvaluation.user_name && (
+                          <p>
+                            <strong>Email:</strong>{" "}
+                            {selectedEvaluation.user_email}
+                          </p>
+                        )}
+                        <p>
+                          <strong>Modelo:</strong>{" "}
+                          {selectedEvaluation.model_key}
+                        </p>
+                        <p>
+                          <strong>Data:</strong>{" "}
+                          {new Date(
+                            selectedEvaluation.created_at
+                          ).toLocaleDateString("pt-BR", {
+                            day: "2-digit",
+                            month: "2-digit",
+                            year: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setSelectedEvaluation(null)}
+                      className="text-gray-500 hover:text-gray-700 text-2xl"
+                    >
+                      ×
+                    </button>
+                  </div>
+
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold border-b pb-2">
+                      Respostas
+                    </h3>
+                    {selectedEvaluation.responses.map((response, idx) => (
+                      <div key={idx} className="border rounded p-4">
+                        <p className="font-medium mb-2">
+                          {idx + 1}. {response.question_text}
+                        </p>
+                        <div className="text-sm text-gray-700 pl-4">
+                          {response.question_type === "select" ? (
+                            <p>
+                              <strong>Resposta:</strong>{" "}
+                              {response.answer_label || response.answer_value}
+                            </p>
+                          ) : response.question_type === "input_string" ? (
+                            <p>
+                              <strong>Resposta:</strong> {response.answer_text}
+                            </p>
+                          ) : null}
+                          {response.rating && (
+                            <p className="mt-1">
+                              <strong>Avaliação:</strong> {response.rating}/5
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="mt-6 flex justify-end">
+                    <button
+                      onClick={() => setSelectedEvaluation(null)}
+                      className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
+                    >
+                      Fechar
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
           )}
 
           {/* Empty State */}

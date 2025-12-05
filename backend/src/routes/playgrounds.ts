@@ -23,7 +23,11 @@ router.get('/', async (req: Request, res: Response) => {
       .eq('is_active', true)
       .order('created_at', { ascending: false });
 
-    if (error) throw error;
+    if (error) {
+      console.error('Error fetching playgrounds:', error);
+      res.status(500).json({ error: 'Failed to fetch playgrounds' });
+      return;
+    }
 
     // Filter by restricted emails if applicable
     const availablePlaygrounds = (playgrounds || []).filter(pg => {
@@ -33,9 +37,25 @@ router.get('/', async (req: Request, res: Response) => {
       return pg.restricted_emails.includes(userEmail);
     });
 
-    res.json({ data: availablePlaygrounds });
+    // Fetch counters for each playground
+    const playgroundsWithCounters = await Promise.all(
+      availablePlaygrounds.map(async (playground) => {
+        const { data: counters } = await db
+          .from('evaluation_counters')
+          .select('*')
+          .eq('playground_id', playground.id);
+
+        return {
+          ...playground,
+          counters,
+        };
+      })
+    );
+
+    res.json({ data: playgroundsWithCounters });
   } catch (error) {
-    throw error;
+    console.error('Error in GET /playgrounds:', error);
+    res.status(500).json({ error: 'Failed to fetch playgrounds' });
   }
 });
 
@@ -56,6 +76,7 @@ router.get('/:id', async (req: Request, res: Response) => {
       .single();
 
     if (error || !playground) {
+      console.error('Error fetching playground:', error);
       res.status(404).json({ error: 'Playground not found' });
       return;
     }
@@ -96,7 +117,8 @@ router.get('/:id', async (req: Request, res: Response) => {
       },
     });
   } catch (error) {
-    throw error;
+    console.error('Error fetching playground:', error);
+    res.status(500).json({ error: 'Failed to fetch playground' });
   }
 });
 
@@ -176,7 +198,11 @@ router.post('/:id/evaluations', async (req: Request, res: Response) => {
       .from('evaluations')
       .insert(evaluationInserts);
 
-    if (insertError) throw insertError;
+    if (insertError) {
+      console.error('Error inserting evaluations:', insertError);
+      res.status(500).json({ error: 'Failed to insert evaluations' });
+      return;
+    }
 
     // Increment counter
     const { error: updateError } = await db
@@ -184,14 +210,19 @@ router.post('/:id/evaluations', async (req: Request, res: Response) => {
       .update({ current_count: counter.current_count + 1 })
       .eq('id', counter.id);
 
-    if (updateError) throw updateError;
+    if (updateError) {
+      console.error('Error updating counter:', updateError);
+      res.status(500).json({ error: 'Failed to update counter' });
+      return;
+    }
 
     res.status(201).json({
       message: 'Evaluation submitted successfully',
       session_id: payload.session_id,
     });
   } catch (error) {
-    throw error;
+    console.error('Error submitting evaluation:', error);
+    res.status(500).json({ error: 'Failed to submit evaluation' });
   }
 });
 
@@ -223,7 +254,8 @@ router.get('/:id/next-model', async (req: Request, res: Response) => {
       res.json({ data: { model_key: models[0].model_key } });
     }
   } catch (error) {
-    throw error;
+    console.error('Error getting next model:', error);
+    res.status(500).json({ error: 'Failed to get next model' });
   }
 });
 
@@ -242,7 +274,11 @@ router.get('/:id/progress', async (req: Request, res: Response) => {
       .eq('playground_id', id)
       .eq('user_id', userId);
 
-    if (error) throw error;
+    if (error) {
+      console.error('Error fetching progress:', error);
+      res.status(500).json({ error: 'Failed to fetch progress' });
+      return;
+    }
 
     // Count evaluations per model
     const progress: Record<string, number> = {};
@@ -252,7 +288,8 @@ router.get('/:id/progress', async (req: Request, res: Response) => {
 
     res.json({ data: { progress, total: evaluations?.length || 0 } });
   } catch (error) {
-    throw error;
+    console.error('Error in progress endpoint:', error);
+    res.status(500).json({ error: 'Failed to get progress' });
   }
 });
 
