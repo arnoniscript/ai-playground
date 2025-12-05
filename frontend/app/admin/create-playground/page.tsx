@@ -22,6 +22,15 @@ interface QuestionInput {
   options?: string[];
 }
 
+// Helper function for generating IDs (works in SSR and client)
+const generateId = () => {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  // Fallback for SSR
+  return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+};
+
 export default function CreatePlaygroundPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -45,7 +54,7 @@ export default function CreatePlaygroundPage() {
   // Questions
   const [questions, setQuestions] = useState<QuestionInput[]>([
     {
-      id: crypto.randomUUID(),
+      id: generateId(),
       text: "",
       type: "select",
       required: true,
@@ -82,7 +91,7 @@ export default function CreatePlaygroundPage() {
           if (playgroundData.questions && playgroundData.questions.length > 0) {
             setQuestions(
               playgroundData.questions.map((q: any) => ({
-                id: crypto.randomUUID(), // New IDs for duplicated questions
+                id: generateId(), // New IDs for duplicated questions
                 text: q.question_text,
                 type: q.question_type,
                 required: q.required,
@@ -127,7 +136,7 @@ export default function CreatePlaygroundPage() {
     setQuestions([
       ...questions,
       {
-        id: crypto.randomUUID(),
+        id: generateId(),
         text: "",
         type: "select",
         required: true,
