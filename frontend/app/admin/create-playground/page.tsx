@@ -6,6 +6,9 @@ import { AdminGuard } from "@/components/auth-guard";
 import { Layout } from "@/components/layout";
 import api from "@/lib/api";
 
+// Force dynamic rendering
+export const dynamic = "force-dynamic";
+
 type PlaygroundType = "ab_testing" | "tuning";
 type QuestionType = "select" | "input_string";
 
