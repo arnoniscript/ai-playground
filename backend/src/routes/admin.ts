@@ -458,12 +458,17 @@ router.get('/playgrounds/:id/metrics', adminOnly, async (req: Request, res: Resp
       const sessionId = evaluation.session_id;
       if (!sessionId) return;
 
+      // Extract user info (users might be returned as array by Supabase)
+      const userInfo = Array.isArray(evaluation.users) 
+        ? evaluation.users[0] 
+        : evaluation.users;
+
       if (!evaluationsBySession[sessionId]) {
         evaluationsBySession[sessionId] = {
           session_id: sessionId,
           user_id: evaluation.user_id,
-          user_email: evaluation.users?.email || 'Desconhecido',
-          user_name: evaluation.users?.full_name || null,
+          user_email: userInfo?.email || 'Desconhecido',
+          user_name: userInfo?.full_name || null,
           model_key: evaluation.model_key,
           created_at: evaluation.created_at,
           evaluation_count: 0,
@@ -540,21 +545,33 @@ router.get('/playgrounds/:id/evaluations/:sessionId', adminOnly, async (req: Req
       return;
     }
 
+    // Extract user info (users is returned as array by Supabase)
+    const userInfo = Array.isArray(evaluationDetails[0].users) 
+      ? evaluationDetails[0].users[0] 
+      : evaluationDetails[0].users;
+    
+    const questionInfo = Array.isArray(evaluationDetails[0].questions)
+      ? evaluationDetails[0].questions[0]
+      : evaluationDetails[0].questions;
+
     const formattedDetails = {
       session_id: sessionId,
-      user_email: evaluationDetails[0].users?.email,
-      user_name: evaluationDetails[0].users?.full_name,
+      user_email: userInfo?.email || '',
+      user_name: userInfo?.full_name || null,
       model_key: evaluationDetails[0].model_key,
       created_at: evaluationDetails[0].created_at,
-      responses: evaluationDetails.map((e: any) => ({
-        question_id: e.question_id,
-        question_text: e.questions?.question_text,
-        question_type: e.questions?.question_type,
-        answer_text: e.answer_text,
-        answer_value: e.answer_value,
-        answer_label: e.questions?.options?.find((opt: any) => opt.value === e.answer_value)?.label || e.answer_value,
-        rating: e.rating,
-      })),
+      responses: evaluationDetails.map((e: any) => {
+        const question = Array.isArray(e.questions) ? e.questions[0] : e.questions;
+        return {
+          question_id: e.question_id,
+          question_text: question?.question_text || '',
+          question_type: question?.question_type || '',
+          answer_text: e.answer_text,
+          answer_value: e.answer_value,
+          answer_label: question?.options?.find((opt: any) => opt.value === e.answer_value)?.label || e.answer_value,
+          rating: e.rating,
+        };
+      }),
     };
 
     res.json({ data: formattedDetails });
