@@ -127,6 +127,7 @@ router.post('/playgrounds', adminOnly, async (req: Request, res: Response) => {
         support_text: payload.support_text,
         created_by: req.user?.id,
         restricted_emails: payload.restricted_emails || null,
+        evaluation_goal: payload.evaluation_goal,
       })
       .select()
       .single();
@@ -227,6 +228,7 @@ router.put('/playgrounds/:id', adminOnly, async (req: Request, res: Response) =>
     if (payload.support_text !== undefined) updateData.support_text = payload.support_text;
     if (payload.restricted_emails !== undefined) updateData.restricted_emails = payload.restricted_emails;
     if (payload.is_active !== undefined) updateData.is_active = payload.is_active;
+    if (payload.evaluation_goal !== undefined) updateData.evaluation_goal = payload.evaluation_goal;
 
     console.log('PUT /admin/playgrounds/:id - Update data:', updateData);
 

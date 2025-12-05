@@ -24,6 +24,7 @@ interface PlaygroundMetrics {
   playground_name: string;
   playground_type: string;
   is_active: boolean;
+  evaluation_goal: number;
   total_evaluations: number;
   unique_testers: number;
   avg_evaluations_per_tester: number;
@@ -122,6 +123,7 @@ export default function PlaygroundMetricsPage() {
         playground_name: playground.name,
         playground_type: playground.type,
         is_active: playground.is_active,
+        evaluation_goal: playground.evaluation_goal || 100,
         total_evaluations: data.stats.totalEvaluations || 0,
         unique_testers: data.stats.uniqueTesters || 0,
         avg_evaluations_per_tester:
@@ -220,10 +222,39 @@ export default function PlaygroundMetricsPage() {
           </div>
 
           {/* Summary Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
             <div className="bg-white border rounded-lg p-6">
               <p className="text-sm text-gray-600 mb-1">Total de Avaliações</p>
-              <p className="text-3xl font-bold">{metrics.total_evaluations}</p>
+              <p className="text-3xl font-bold">
+                {metrics.total_evaluations}{" "}
+                <span className="text-lg text-gray-500">
+                  de {metrics.evaluation_goal}
+                </span>
+              </p>
+            </div>
+
+            <div className="bg-white border rounded-lg p-6">
+              <p className="text-sm text-gray-600 mb-1">Progresso</p>
+              <div className="flex items-center gap-3">
+                <div className="flex-1 bg-gray-200 rounded-full h-3">
+                  <div
+                    className="bg-blue-600 h-3 rounded-full transition-all duration-300"
+                    style={{
+                      width: `${Math.min(
+                        100,
+                        (metrics.total_evaluations / metrics.evaluation_goal) *
+                          100
+                      )}%`,
+                    }}
+                  ></div>
+                </div>
+                <p className="text-2xl font-bold min-w-[60px]">
+                  {Math.round(
+                    (metrics.total_evaluations / metrics.evaluation_goal) * 100
+                  )}
+                  %
+                </p>
+              </div>
             </div>
 
             <div className="bg-white border rounded-lg p-6">

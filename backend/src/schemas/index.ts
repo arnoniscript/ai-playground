@@ -17,6 +17,7 @@ export const CreatePlaygroundSchema = z.object({
   description: z.string().optional(),
   support_text: z.string().optional(), // Can contain HTML
   restricted_emails: z.array(z.string().email()).optional(),
+  evaluation_goal: z.number().int().positive().min(1),
   models: z.array(z.object({
     model_key: z.string(),
     model_name: z.string(),

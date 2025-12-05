@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { AdminGuard } from "@/components/auth-guard";
 import { Layout } from "@/components/layout";
 import api from "@/lib/api";
@@ -24,6 +24,9 @@ interface QuestionInput {
 
 export default function CreatePlaygroundPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const isDuplicate = searchParams.get("duplicate") === "true";
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
 
@@ -32,6 +35,7 @@ export default function CreatePlaygroundPage() {
   const [type, setType] = useState<PlaygroundType>("ab_testing");
   const [description, setDescription] = useState("");
   const [supportText, setSupportText] = useState("");
+  const [evaluationGoal, setEvaluationGoal] = useState<number>(100);
 
   // Models
   const [models, setModels] = useState<ModelInput[]>([
@@ -48,6 +52,56 @@ export default function CreatePlaygroundPage() {
       options: [""],
     },
   ]);
+
+  // Load duplicate data on mount if duplicating
+  useEffect(() => {
+    if (isDuplicate) {
+      const storedData = localStorage.getItem("duplicatePlayground");
+      if (storedData) {
+        try {
+          const playgroundData = JSON.parse(storedData);
+
+          // Pre-fill basic info
+          setName(`${playgroundData.name} (Cópia)`);
+          setType(playgroundData.type);
+          setDescription(playgroundData.description || "");
+          setSupportText(playgroundData.support_text || "");
+          setEvaluationGoal(playgroundData.evaluation_goal || 100);
+
+          // Pre-fill models
+          if (playgroundData.models && playgroundData.models.length > 0) {
+            setModels(
+              playgroundData.models.map((m: any) => ({
+                key: m.model_key,
+                embedCode: m.embed_code,
+              }))
+            );
+          }
+
+          // Pre-fill questions
+          if (playgroundData.questions && playgroundData.questions.length > 0) {
+            setQuestions(
+              playgroundData.questions.map((q: any) => ({
+                id: crypto.randomUUID(), // New IDs for duplicated questions
+                text: q.question_text,
+                type: q.question_type,
+                required: q.required,
+                options:
+                  q.question_type === "select" && q.options
+                    ? q.options.map((opt: any) => opt.label)
+                    : [""],
+              }))
+            );
+          }
+
+          // Clear localStorage after loading
+          localStorage.removeItem("duplicatePlayground");
+        } catch (err) {
+          console.error("Error loading duplicate data:", err);
+        }
+      }
+    }
+  }, [isDuplicate]);
 
   const addModel = () => {
     setModels([...models, { key: "", embedCode: "" }]);
@@ -146,6 +200,11 @@ export default function CreatePlaygroundPage() {
       return;
     }
 
+    if (!evaluationGoal || evaluationGoal < 1) {
+      setError("Meta de avaliações deve ser um número positivo");
+      return;
+    }
+
     if (type === "ab_testing" && models.length < 2) {
       setError("Testes A/B requerem pelo menos 2 modelos");
       return;
@@ -183,6 +242,7 @@ export default function CreatePlaygroundPage() {
         type,
         description: description || undefined,
         support_text: supportText || undefined,
+        evaluation_goal: evaluationGoal,
         models: models.map((m) => ({
           model_key: m.key,
           model_name: m.key, // Using key as name for now
@@ -291,6 +351,26 @@ export default function CreatePlaygroundPage() {
                     rows={3}
                     placeholder="Instruções ou informações adicionais para os avaliadores"
                   />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-1">
+                    Meta de Avaliações *
+                  </label>
+                  <input
+                    type="number"
+                    value={evaluationGoal}
+                    onChange={(e) =>
+                      setEvaluationGoal(parseInt(e.target.value) || 0)
+                    }
+                    className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    min="1"
+                    required
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Número objetivo de avaliações a serem realizadas neste
+                    playground
+                  </p>
                 </div>
               </div>
             </section>

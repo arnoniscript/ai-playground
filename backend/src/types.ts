@@ -23,6 +23,7 @@ export interface Playground {
   created_by: string;
   is_active: boolean;
   restricted_emails: string[] | null;
+  evaluation_goal: number;
   created_at: string;
   updated_at: string;
 }

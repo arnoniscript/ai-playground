@@ -17,6 +17,7 @@ export interface Playground {
   created_by: string;
   is_active: boolean;
   restricted_emails: string[] | null;
+  evaluation_goal: number;
   models?: ModelConfiguration[];
   questions?: Question[];
   counters?: EvaluationCounter[];
