@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AdminGuard } from "@/components/auth-guard";
 import { Layout } from "@/components/layout";
@@ -34,7 +34,7 @@ const generateId = () => {
   return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 };
 
-export default function CreatePlaygroundPage() {
+function CreatePlaygroundForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const isDuplicate = searchParams.get("duplicate") === "true";
@@ -633,5 +633,28 @@ export default function CreatePlaygroundPage() {
         </div>
       </Layout>
     </AdminGuard>
+  );
+}
+
+export default function CreatePlaygroundPage() {
+  return (
+    <Suspense
+      fallback={
+        <AdminGuard>
+          <Layout>
+            <div className="max-w-4xl mx-auto p-6">
+              <div className="flex items-center justify-center min-h-screen">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                  <p>Carregando...</p>
+                </div>
+              </div>
+            </div>
+          </Layout>
+        </AdminGuard>
+      }
+    >
+      <CreatePlaygroundForm />
+    </Suspense>
   );
 }
