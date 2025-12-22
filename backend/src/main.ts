@@ -5,6 +5,9 @@ import { errorHandler } from './middleware/errorHandler.js';
 import authRoutes from './routes/auth.js';
 import adminRoutes from './routes/admin.js';
 import playgroundRoutes from './routes/playgrounds.js';
+import coursesAdminRoutes from './routes/courses-admin.js';
+import coursesRoutes from './routes/courses.js';
+import coursesMetricsRoutes from './routes/courses-metrics.js';
 
 // Validate environment
 validateConfig();
@@ -22,6 +25,9 @@ app.use(cors({
 app.use('/auth', authRoutes);
 app.use('/admin', adminRoutes);
 app.use('/playgrounds', playgroundRoutes);
+app.use('/admin/courses', coursesAdminRoutes);
+app.use('/courses', coursesRoutes);
+app.use('/admin/courses', coursesMetricsRoutes);
 
 // Health check
 app.get('/health', (req, res) => {

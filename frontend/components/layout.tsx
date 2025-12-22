@@ -40,6 +40,13 @@ export function Layout({ children }: { children: ReactNode }) {
                 Playgrounds
               </Link>
 
+              <Link
+                href={isAdmin() ? "/admin/courses" : "/courses"}
+                className="text-blue-600 hover:text-blue-700"
+              >
+                Cursos Introdutórios
+              </Link>
+
               <div className="text-sm text-gray-600">
                 {user.full_name || user.email}
               </div>

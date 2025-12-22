@@ -6,6 +6,7 @@ import { AuthGuard } from "@/components/auth-guard";
 import { Layout } from "@/components/layout";
 import { ModelEmbed } from "@/components/model-embed";
 import { EvaluationForm } from "@/components/evaluation-form";
+import { CourseDrawer } from "@/components/course-drawer";
 import api from "@/lib/api";
 import { Playground, ModelConfiguration, Question } from "@/lib/types";
 import { v4 as uuidv4 } from "uuid";
@@ -22,6 +23,9 @@ export default function PlaygroundEvaluationPage() {
   const [currentStep, setCurrentStep] = useState(0);
   const [sessionId] = useState(uuidv4());
   const [selectedModel, setSelectedModel] = useState<string | null>(null);
+  const [contentAlignment, setContentAlignment] = useState<
+    "left" | "center" | "right"
+  >("center");
 
   useEffect(() => {
     fetchPlaygroundData();
@@ -31,6 +35,12 @@ export default function PlaygroundEvaluationPage() {
     try {
       const response = await api.get(`/playgrounds/${playgroundId}`);
       const data = response.data.data;
+
+      // Check if course is required and not completed
+      if (data.course_access_blocked) {
+        router.push(`/courses/${data.linked_course_id}`);
+        return;
+      }
 
       // Backend now returns flattened structure
       setPlayground(data);
@@ -134,10 +144,96 @@ export default function PlaygroundEvaluationPage() {
     (q) => q.model_key === selectedModel || q.model_key === null
   );
 
+  const getAlignmentClass = () => {
+    switch (contentAlignment) {
+      case "left":
+        return "mr-auto ml-0";
+      case "right":
+        return "ml-auto mr-0";
+      default:
+        return "mx-auto";
+    }
+  };
+
   return (
     <AuthGuard>
       <Layout>
-        <div className="max-w-4xl mx-auto space-y-8">
+        {/* Alignment Controls */}
+        <div className="fixed top-20 right-4 z-30 bg-white shadow-lg rounded-lg p-2 flex gap-1">
+          <button
+            onClick={() => setContentAlignment("left")}
+            className={`p-2 rounded transition-colors ${
+              contentAlignment === "left"
+                ? "bg-blue-500 text-white"
+                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+            }`}
+            title="Alinhar à esquerda"
+          >
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M4 6h16M4 12h10M4 18h7"
+              />
+            </svg>
+          </button>
+          <button
+            onClick={() => setContentAlignment("center")}
+            className={`p-2 rounded transition-colors ${
+              contentAlignment === "center"
+                ? "bg-blue-500 text-white"
+                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+            }`}
+            title="Centralizar"
+          >
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M4 6h16M8 12h8M9 18h6"
+              />
+            </svg>
+          </button>
+          <button
+            onClick={() => setContentAlignment("right")}
+            className={`p-2 rounded transition-colors ${
+              contentAlignment === "right"
+                ? "bg-blue-500 text-white"
+                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+            }`}
+            title="Alinhar à direita"
+          >
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M4 6h16M10 12h10M13 18h7"
+              />
+            </svg>
+          </button>
+        </div>
+
+        <div
+          className={`max-w-4xl space-y-8 transition-all duration-300 ${getAlignmentClass()}`}
+        >
           {/* Header */}
           <div className="bg-white rounded-lg shadow p-6">
             <h1 className="text-3xl font-bold text-gray-900 mb-2">
@@ -145,6 +241,26 @@ export default function PlaygroundEvaluationPage() {
             </h1>
             {playground.description && (
               <p className="text-gray-600 mb-4">{playground.description}</p>
+            )}
+
+            {/* Course info badge */}
+            {playground.linked_course && (
+              <div className="mt-4 flex items-center gap-2 text-sm">
+                <span
+                  className={`px-3 py-1 rounded-full font-medium ${
+                    playground.user_course_progress?.completed
+                      ? "bg-green-100 text-green-800"
+                      : "bg-blue-100 text-blue-800"
+                  }`}
+                >
+                  {playground.user_course_progress?.completed
+                    ? "✓ Curso Concluído"
+                    : "📚 Curso Disponível"}
+                </span>
+                <span className="text-gray-600">
+                  {playground.linked_course.title} • Use a aba lateral
+                </span>
+              </div>
             )}
 
             {playground.type === "ab_testing" && (
@@ -184,6 +300,15 @@ export default function PlaygroundEvaluationPage() {
             />
           </div>
         </div>
+
+        {/* Course Drawer - Always present when course is linked */}
+        {playground.linked_course && (
+          <CourseDrawer
+            courseId={playground.linked_course.id}
+            courseTitle={playground.linked_course.title}
+            isCompleted={playground.user_course_progress?.completed || false}
+          />
+        )}
       </Layout>
     </AuthGuard>
   );

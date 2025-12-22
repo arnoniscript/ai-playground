@@ -49,6 +49,11 @@ function CreatePlaygroundForm() {
   const [supportText, setSupportText] = useState("");
   const [evaluationGoal, setEvaluationGoal] = useState<number>(100);
 
+  // Course linking
+  const [linkedCourseId, setLinkedCourseId] = useState<string>("");
+  const [courseRequired, setCourseRequired] = useState<boolean>(false);
+  const [availableCourses, setAvailableCourses] = useState<any[]>([]);
+
   // Models
   const [models, setModels] = useState<ModelInput[]>([
     { key: "", embedCode: "" },
@@ -67,6 +72,18 @@ function CreatePlaygroundForm() {
 
   // Load duplicate data on mount if duplicating
   useEffect(() => {
+    // Load available courses
+    const fetchCourses = async () => {
+      try {
+        const response = await api.get("/admin/courses");
+        const courses = response.data.data || [];
+        setAvailableCourses(courses.filter((c: any) => c.is_published));
+      } catch (err) {
+        console.error("Error loading courses:", err);
+      }
+    };
+    fetchCourses();
+
     if (isDuplicate) {
       const storedData = localStorage.getItem("duplicatePlayground");
       if (storedData) {
@@ -255,6 +272,8 @@ function CreatePlaygroundForm() {
         description: description || undefined,
         support_text: supportText || undefined,
         evaluation_goal: evaluationGoal,
+        linked_course_id: linkedCourseId || null,
+        course_required: courseRequired,
         models: models.map((m) => ({
           model_key: m.key,
           model_name: m.key, // Using key as name for now
@@ -384,6 +403,62 @@ function CreatePlaygroundForm() {
                     playground
                   </p>
                 </div>
+              </div>
+            </section>
+
+            {/* Course Linking Section */}
+            <section className="bg-white border rounded-lg p-6">
+              <h2 className="text-xl font-semibold mb-4">
+                Curso Introdutório (Opcional)
+              </h2>
+              <p className="text-sm text-gray-600 mb-4">
+                Vincule um curso introdutório que os usuários devem completar
+                antes ou durante o uso deste playground.
+              </p>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">
+                    Curso Vinculado
+                  </label>
+                  <select
+                    value={linkedCourseId}
+                    onChange={(e) => setLinkedCourseId(e.target.value)}
+                    className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">Nenhum curso vinculado</option>
+                    {availableCourses.map((course) => (
+                      <option key={course.id} value={course.id}>
+                        {course.title}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {linkedCourseId && (
+                  <div className="flex items-start space-x-2">
+                    <input
+                      type="checkbox"
+                      id="courseRequired"
+                      checked={courseRequired}
+                      onChange={(e) => setCourseRequired(e.target.checked)}
+                      className="mt-1"
+                    />
+                    <div>
+                      <label
+                        htmlFor="courseRequired"
+                        className="text-sm font-medium cursor-pointer"
+                      >
+                        Curso obrigatório
+                      </label>
+                      <p className="text-xs text-gray-600 mt-1">
+                        {courseRequired
+                          ? "Usuários DEVEM completar o curso antes de acessar este playground"
+                          : "Curso será sugerido mas não é obrigatório"}
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
             </section>
 

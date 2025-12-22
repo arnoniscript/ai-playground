@@ -67,6 +67,7 @@ router.get('/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const userEmail = req.user?.email;
+    const userId = req.user!.id;
 
     const { data: playground, error } = await db
       .from('playgrounds')
@@ -86,6 +87,40 @@ router.get('/:id', async (req: Request, res: Response) => {
       if (!playground.restricted_emails.includes(userEmail)) {
         res.status(403).json({ error: 'Access denied' });
         return;
+      }
+    }
+
+    // Check course requirement
+    let linkedCourse = null;
+    let userCourseProgress = null;
+    let courseAccessBlocked = false;
+
+    if (playground.linked_course_id) {
+      // Get course details
+      const { data: course } = await db
+        .from('courses')
+        .select('id, title, description, is_published')
+        .eq('id', playground.linked_course_id)
+        .eq('is_published', true)
+        .single();
+
+      if (course) {
+        linkedCourse = course;
+
+        // Get user's progress in the course
+        const { data: progress } = await db
+          .from('user_course_progress')
+          .select('*')
+          .eq('user_id', userId)
+          .eq('course_id', course.id)
+          .single();
+
+        userCourseProgress = progress;
+
+        // Block access if course is required and not completed
+        if (playground.course_required && (!progress || !progress.completed)) {
+          courseAccessBlocked = true;
+        }
       }
     }
 
@@ -114,6 +149,9 @@ router.get('/:id', async (req: Request, res: Response) => {
         models,
         questions,
         counters,
+        linked_course: linkedCourse,
+        user_course_progress: userCourseProgress,
+        course_access_blocked: courseAccessBlocked,
       },
     });
   } catch (error) {

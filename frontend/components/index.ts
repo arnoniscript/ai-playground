@@ -3,3 +3,5 @@ export { Layout } from './layout';
 export { LoginForm } from './login-form';
 export { EvaluationForm } from './evaluation-form';
 export { ModelEmbed } from './model-embed';
+export { CourseModal } from './course-modal';
+export { CourseDrawer } from './course-drawer';

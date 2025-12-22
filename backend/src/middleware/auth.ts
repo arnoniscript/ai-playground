@@ -72,3 +72,7 @@ export function testerOnly(
 
   next();
 }
+
+// Export aliases for compatibility
+export const authenticateToken = authMiddleware;
+export const requireAdmin = adminOnly;

@@ -128,6 +128,8 @@ router.post('/playgrounds', adminOnly, async (req: Request, res: Response) => {
         created_by: req.user?.id,
         restricted_emails: payload.restricted_emails || null,
         evaluation_goal: payload.evaluation_goal,
+        linked_course_id: payload.linked_course_id || null,
+        course_required: payload.course_required || false,
       })
       .select()
       .single();
@@ -229,6 +231,8 @@ router.put('/playgrounds/:id', adminOnly, async (req: Request, res: Response) =>
     if (payload.restricted_emails !== undefined) updateData.restricted_emails = payload.restricted_emails;
     if (payload.is_active !== undefined) updateData.is_active = payload.is_active;
     if (payload.evaluation_goal !== undefined) updateData.evaluation_goal = payload.evaluation_goal;
+    if (payload.linked_course_id !== undefined) updateData.linked_course_id = payload.linked_course_id;
+    if (payload.course_required !== undefined) updateData.course_required = payload.course_required;
 
     console.log('PUT /admin/playgrounds/:id - Update data:', updateData);
 
