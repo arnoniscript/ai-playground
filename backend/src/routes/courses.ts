@@ -443,4 +443,38 @@ router.get(
   })
 );
 
+/**
+ * GET /api/courses/:courseId/playgrounds
+ * Get playgrounds linked to this course
+ */
+router.get(
+  '/:courseId/playgrounds',
+  asyncHandler(async (req: Request, res: Response) => {
+    const { courseId } = req.params;
+    const userEmail = req.user!.email;
+
+    const { data: playgrounds, error } = await db
+      .from('playgrounds')
+      .select('id, name, description, type, is_active, restricted_emails')
+      .eq('linked_course_id', courseId)
+      .eq('is_active', true)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      res.status(500).json({ error: 'Failed to fetch playgrounds' });
+      return;
+    }
+
+    // Filter by restricted emails if applicable
+    const availablePlaygrounds = (playgrounds || []).filter(pg => {
+      if (!pg.restricted_emails || pg.restricted_emails.length === 0) {
+        return true; // Available to all
+      }
+      return pg.restricted_emails.includes(userEmail);
+    });
+
+    res.json({ data: availablePlaygrounds });
+  })
+);
+
 export default router;

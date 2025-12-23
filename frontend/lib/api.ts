@@ -144,6 +144,12 @@ export const coursesApi = {
   // Get step attempts
   getStepAttempts: (courseId: string, stepId: string) =>
     api.get<{ data: UserStepAttempt[] }>(`/courses/${courseId}/steps/${stepId}/attempts`),
+
+  // Get playgrounds linked to this course
+  getLinkedPlaygrounds: (courseId: string) =>
+    api.get<{ data: Array<{ id: string; name: string; description?: string; type: string }> }>(
+      `/courses/${courseId}/playgrounds`
+    ),
 };
 
 // Metrics functions
