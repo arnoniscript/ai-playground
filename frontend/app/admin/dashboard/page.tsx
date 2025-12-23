@@ -157,9 +157,17 @@ export default function AdminDashboard() {
                         <div className="p-6 cursor-pointer">
                           <div className="flex justify-between items-start mb-4">
                             <div className="flex-1">
-                              <h2 className="text-2xl font-bold text-gray-900 mb-2">
-                                {playground.name}
-                              </h2>
+                              <div className="flex items-center gap-2 mb-2">
+                                <h2 className="text-2xl font-bold text-gray-900">
+                                  {playground.name}
+                                </h2>
+                                {playground.restricted_emails &&
+                                  playground.restricted_emails.length > 0 && (
+                                    <span className="inline-flex items-center gap-1 px-2 py-1 bg-amber-100 text-amber-800 text-xs font-medium rounded-full">
+                                      🔒 Privado
+                                    </span>
+                                  )}
+                              </div>
                               {playground.description && (
                                 <p className="text-gray-600 text-base">
                                   {playground.description}

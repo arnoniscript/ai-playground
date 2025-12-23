@@ -54,6 +54,11 @@ function CreatePlaygroundForm() {
   const [courseRequired, setCourseRequired] = useState<boolean>(false);
   const [availableCourses, setAvailableCourses] = useState<any[]>([]);
 
+  // Access control
+  const [isPrivate, setIsPrivate] = useState<boolean>(false);
+  const [selectedEmails, setSelectedEmails] = useState<string[]>([]);
+  const [availableUsers, setAvailableUsers] = useState<any[]>([]);
+
   // Models
   const [models, setModels] = useState<ModelInput[]>([
     { key: "", embedCode: "" },
@@ -83,6 +88,17 @@ function CreatePlaygroundForm() {
       }
     };
     fetchCourses();
+
+    // Load available users
+    const fetchUsers = async () => {
+      try {
+        const response = await api.get("/admin/users");
+        setAvailableUsers(response.data.data || []);
+      } catch (err) {
+        console.error("Error loading users:", err);
+      }
+    };
+    fetchUsers();
 
     if (isDuplicate) {
       const storedData = localStorage.getItem("duplicatePlayground");
@@ -274,6 +290,7 @@ function CreatePlaygroundForm() {
         evaluation_goal: evaluationGoal,
         linked_course_id: linkedCourseId || null,
         course_required: courseRequired,
+        restricted_emails: isPrivate ? selectedEmails : null,
         models: models.map((m) => ({
           model_key: m.key,
           model_name: m.key, // Using key as name for now
@@ -457,6 +474,100 @@ function CreatePlaygroundForm() {
                           : "Curso será sugerido mas não é obrigatório"}
                       </p>
                     </div>
+                  </div>
+                )}
+              </div>
+            </section>
+
+            {/* Access Control Section */}
+            <section className="bg-white border rounded-lg p-6">
+              <h2 className="text-xl font-semibold mb-4">Controle de Acesso</h2>
+              <p className="text-sm text-gray-600 mb-4">
+                Por padrão, playgrounds são públicos. Torne privado para
+                restringir acesso.
+              </p>
+
+              <div className="space-y-4">
+                <div className="flex items-center space-x-3">
+                  <input
+                    type="checkbox"
+                    id="isPrivate"
+                    checked={isPrivate}
+                    onChange={(e) => {
+                      setIsPrivate(e.target.checked);
+                      if (!e.target.checked) {
+                        setSelectedEmails([]);
+                      }
+                    }}
+                    className="w-4 h-4"
+                  />
+                  <div>
+                    <label
+                      htmlFor="isPrivate"
+                      className="text-sm font-medium cursor-pointer"
+                    >
+                      🔒 Playground Privado
+                    </label>
+                    <p className="text-xs text-gray-600 mt-1">
+                      Apenas usuários selecionados poderão acessar
+                    </p>
+                  </div>
+                </div>
+
+                {isPrivate && (
+                  <div>
+                    <label className="block text-sm font-medium mb-2">
+                      Usuários com Acesso
+                    </label>
+                    <div className="border rounded-lg p-4 max-h-60 overflow-y-auto space-y-2">
+                      {availableUsers.length === 0 ? (
+                        <p className="text-sm text-gray-500">
+                          Carregando usuários...
+                        </p>
+                      ) : (
+                        availableUsers.map((user) => (
+                          <label
+                            key={user.email}
+                            className="flex items-center space-x-2 p-2 hover:bg-gray-50 rounded cursor-pointer"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={selectedEmails.includes(user.email)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedEmails([
+                                    ...selectedEmails,
+                                    user.email,
+                                  ]);
+                                } else {
+                                  setSelectedEmails(
+                                    selectedEmails.filter(
+                                      (email) => email !== user.email
+                                    )
+                                  );
+                                }
+                              }}
+                              className="w-4 h-4"
+                            />
+                            <div className="flex-1">
+                              <span className="text-sm font-medium">
+                                {user.email}
+                              </span>
+                              {user.role === "admin" && (
+                                <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded">
+                                  Admin
+                                </span>
+                              )}
+                            </div>
+                          </label>
+                        ))
+                      )}
+                    </div>
+                    {selectedEmails.length > 0 && (
+                      <p className="text-xs text-gray-600 mt-2">
+                        {selectedEmails.length} usuário(s) selecionado(s)
+                      </p>
+                    )}
                   </div>
                 )}
               </div>

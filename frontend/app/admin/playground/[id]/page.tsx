@@ -7,6 +7,12 @@ import { Layout } from "@/components/layout";
 import api from "@/lib/api";
 import { Playground } from "@/lib/types";
 
+interface AvailableUser {
+  id: string;
+  email: string;
+  role: "admin" | "tester";
+}
+
 export default function EditPlaygroundPage() {
   const params = useParams();
   const router = useRouter();
@@ -16,20 +22,40 @@ export default function EditPlaygroundPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
+  const [isPrivate, setIsPrivate] = useState(false);
+  const [selectedEmails, setSelectedEmails] = useState<string[]>([]);
+  const [availableUsers, setAvailableUsers] = useState<AvailableUser[]>([]);
 
   useEffect(() => {
     fetchPlayground();
+    fetchAvailableUsers();
   }, [playgroundId]);
 
   const fetchPlayground = async () => {
     try {
       setLoading(true);
       const response = await api.get(`/admin/playgrounds/${playgroundId}`);
-      setPlayground(response.data.data);
+      const pg = response.data.data;
+      setPlayground(pg);
+
+      // Set private mode and selected emails from existing playground
+      const hasRestrictions =
+        pg.restricted_emails && pg.restricted_emails.length > 0;
+      setIsPrivate(hasRestrictions);
+      setSelectedEmails(hasRestrictions ? pg.restricted_emails : []);
     } catch (err: any) {
       setError(err.response?.data?.error || "Erro ao carregar playground");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchAvailableUsers = async () => {
+    try {
+      const response = await api.get("/admin/users");
+      setAvailableUsers(response.data.data || []);
+    } catch (err) {
+      console.error("Failed to fetch users:", err);
     }
   };
 
@@ -63,6 +89,7 @@ export default function EditPlaygroundPage() {
         name: formData.get("name"),
         description: formData.get("description") || undefined,
         support_text: formData.get("support_text") || undefined,
+        restricted_emails: isPrivate ? selectedEmails : null,
       });
 
       setSuccessMessage("Playground atualizado com sucesso!");
@@ -70,6 +97,19 @@ export default function EditPlaygroundPage() {
     } catch (err: any) {
       setError(err.response?.data?.error || "Erro ao atualizar playground");
     }
+  };
+
+  const handleTogglePrivate = (checked: boolean) => {
+    setIsPrivate(checked);
+    if (!checked) {
+      setSelectedEmails([]);
+    }
+  };
+
+  const handleToggleUserEmail = (email: string) => {
+    setSelectedEmails((prev) =>
+      prev.includes(email) ? prev.filter((e) => e !== email) : [...prev, email]
+    );
   };
 
   if (loading) {
@@ -176,6 +216,27 @@ export default function EditPlaygroundPage() {
                     </dd>
                   </div>
                   <div>
+                    <dt className="font-medium text-gray-600">Acesso</dt>
+                    <dd className="mt-1">
+                      {playground.restricted_emails &&
+                      playground.restricted_emails.length > 0 ? (
+                        <div className="space-y-1">
+                          <span className="inline-flex items-center gap-1 px-2 py-1 bg-amber-100 text-amber-800 text-xs font-medium rounded-full">
+                            🔒 Privado
+                          </span>
+                          <div className="text-xs text-gray-600 mt-2">
+                            {playground.restricted_emails.length} usuário(s) com
+                            acesso
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full">
+                          🌐 Público
+                        </span>
+                      )}
+                    </dd>
+                  </div>
+                  <div>
                     <dt className="font-medium text-gray-600">Criado em</dt>
                     <dd className="mt-1">
                       {new Date(playground.created_at).toLocaleDateString(
@@ -236,6 +297,94 @@ export default function EditPlaygroundPage() {
                       className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                       rows={3}
                     />
+                  </div>
+
+                  {/* Access Control Section */}
+                  <div className="pt-4 border-t">
+                    <h3 className="text-md font-semibold mb-3">
+                      Controle de Acesso
+                    </h3>
+
+                    <div className="space-y-4">
+                      <div className="flex items-start space-x-3">
+                        <input
+                          type="checkbox"
+                          id="isPrivate"
+                          checked={isPrivate}
+                          onChange={(e) =>
+                            handleTogglePrivate(e.target.checked)
+                          }
+                          className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                        />
+                        <div className="flex-1">
+                          <label
+                            htmlFor="isPrivate"
+                            className="font-medium cursor-pointer"
+                          >
+                            🔒 Playground Privado
+                          </label>
+                          <p className="text-sm text-gray-600 mt-1">
+                            {isPrivate
+                              ? "Apenas usuários selecionados poderão acessar este playground"
+                              : "Todos os usuários autenticados podem acessar este playground"}
+                          </p>
+                        </div>
+                      </div>
+
+                      {isPrivate && (
+                        <div className="pl-7">
+                          <label className="block text-sm font-medium mb-2">
+                            Usuários com Acesso ({selectedEmails.length}{" "}
+                            selecionado{selectedEmails.length !== 1 ? "s" : ""})
+                          </label>
+                          <div className="border rounded-lg p-3 max-h-60 overflow-y-auto bg-gray-50">
+                            {availableUsers.length === 0 ? (
+                              <p className="text-sm text-gray-500">
+                                Carregando usuários...
+                              </p>
+                            ) : (
+                              <div className="space-y-2">
+                                {availableUsers.map((user) => (
+                                  <div
+                                    key={user.id}
+                                    className="flex items-center space-x-2"
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      id={`user-${user.id}`}
+                                      checked={selectedEmails.includes(
+                                        user.email
+                                      )}
+                                      onChange={() =>
+                                        handleToggleUserEmail(user.email)
+                                      }
+                                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                                    />
+                                    <label
+                                      htmlFor={`user-${user.id}`}
+                                      className="flex-1 text-sm cursor-pointer flex items-center gap-2"
+                                    >
+                                      <span>{user.email}</span>
+                                      {user.role === "admin" && (
+                                        <span className="px-2 py-0.5 bg-purple-100 text-purple-700 text-xs rounded-full">
+                                          Admin
+                                        </span>
+                                      )}
+                                    </label>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                          {selectedEmails.length === 0 && (
+                            <p className="text-xs text-amber-600 mt-2">
+                              ⚠️ Nenhum usuário selecionado. Apenas você
+                              (criador) e outros admins terão acesso.
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   <button
