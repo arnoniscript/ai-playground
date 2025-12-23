@@ -129,8 +129,8 @@ export default function CourseViewPage({ params }: { params: { id: string } }) {
       const response = await coursesApi.completeStep(params.id, currentStep.id);
 
       if (response.data.course_completed) {
+        setProgress(response.data.data);
         alert("Parabéns! Você concluiu o curso!");
-        router.push("/courses");
       } else if (response.data.next_step) {
         setCurrentStepIndex(currentStepIndex + 1);
         setSelectedAnswers({});
@@ -218,11 +218,18 @@ export default function CourseViewPage({ params }: { params: { id: string } }) {
   const isStepUnlocked = (stepIndex: number) => {
     if (stepIndex === 0) return true; // First step always unlocked
 
-    // Check if previous step is completed
-    const prevStep = course.steps[stepIndex - 1];
-    if (!prevStep.has_evaluation) return true; // If previous has no eval, it's unlocked
+    // Check if ALL previous steps with evaluation are completed
+    for (let i = 0; i < stepIndex; i++) {
+      const previousStep = course.steps[i];
+      if (
+        previousStep.has_evaluation &&
+        !completedStepIds.has(previousStep.id)
+      ) {
+        return false; // If any previous step with evaluation is not completed, lock this step
+      }
+    }
 
-    return completedStepIds.has(prevStep.id);
+    return true; // All previous steps with evaluation are completed
   };
 
   const handleStepClick = (stepIndex: number) => {
@@ -507,7 +514,7 @@ export default function CourseViewPage({ params }: { params: { id: string } }) {
                   {lastAttemptResult.passed ||
                   !currentStep.evaluation_required ? (
                     <div className="space-y-4">
-                      <div className="flex gap-4 justify-center">
+                      <div className="flex flex-wrap gap-4 justify-center items-center">
                         {currentStepIndex > 0 && (
                           <button
                             onClick={handlePrevious}
@@ -516,44 +523,71 @@ export default function CourseViewPage({ params }: { params: { id: string } }) {
                             ← Step Anterior
                           </button>
                         )}
-                        <button
-                          onClick={handleContinue}
-                          className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold"
-                        >
-                          Continuar para próximo step →
-                        </button>
-                      </div>
-
-                      {/* Show linked playgrounds on last step */}
-                      {currentStepIndex === course.steps.length - 1 &&
-                        linkedPlaygrounds.length > 0 && (
-                          <div className="border-t pt-6 mt-6">
-                            <h3 className="text-lg font-semibold text-gray-900 mb-4 text-center">
-                              🎯 Continue sua jornada nos playgrounds
-                            </h3>
-                            <div className="flex flex-col gap-3">
-                              {linkedPlaygrounds.map((playground) => (
-                                <button
-                                  key={playground.id}
-                                  onClick={() =>
-                                    router.push(`/playground/${playground.id}`)
-                                  }
-                                  className="w-full px-6 py-4 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:from-purple-700 hover:to-blue-700 font-semibold shadow-lg hover:shadow-xl transition-all"
-                                >
-                                  <div className="flex items-center justify-center gap-2">
-                                    <span>Ir para: {playground.name}</span>
-                                    <span>→</span>
-                                  </div>
-                                  {playground.description && (
-                                    <p className="text-sm text-purple-100 mt-1">
-                                      {playground.description}
-                                    </p>
-                                  )}
-                                </button>
-                              ))}
-                            </div>
-                          </div>
+                        {currentStepIndex === course.steps.length - 1 ? (
+                          progress?.completed ? (
+                            <button
+                              disabled
+                              className="px-6 py-3 bg-gray-400 text-white rounded-lg cursor-not-allowed font-semibold"
+                            >
+                              ✓ Curso Finalizado
+                            </button>
+                          ) : (
+                            <button
+                              onClick={handleContinue}
+                              className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold"
+                            >
+                              Finalizar Curso
+                            </button>
+                          )
+                        ) : (
+                          <button
+                            onClick={handleContinue}
+                            className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold"
+                          >
+                            Continuar para próximo step →
+                          </button>
                         )}
+
+                        {/* Show linked playgrounds on last step - inline */}
+                        {currentStepIndex === course.steps.length - 1 &&
+                          linkedPlaygrounds.map((playground) => (
+                            <button
+                              key={playground.id}
+                              onClick={() =>
+                                router.push(`/playground/${playground.id}`)
+                              }
+                              className="group relative px-6 py-3 text-white rounded-lg font-bold overflow-hidden transition-all duration-300 hover:scale-105 hover:shadow-2xl"
+                              style={{
+                                background:
+                                  "linear-gradient(45deg, #3b82f6, #ef4444, #1e3a8a)",
+                                backgroundSize: "200% 200%",
+                                animation: "gradient 3s ease infinite",
+                              }}
+                            >
+                              <style jsx>{`
+                                @keyframes gradient {
+                                  0% {
+                                    background-position: 0% 50%;
+                                  }
+                                  50% {
+                                    background-position: 100% 50%;
+                                  }
+                                  100% {
+                                    background-position: 0% 50%;
+                                  }
+                                }
+                              `}</style>
+                              <div className="absolute inset-0 backdrop-blur-sm bg-black/10"></div>
+                              <div className="relative flex items-center gap-2">
+                                <span className="text-xl">🎯</span>
+                                <span>{playground.name}</span>
+                                <span className="group-hover:translate-x-1 transition-transform">
+                                  →
+                                </span>
+                              </div>
+                            </button>
+                          ))}
+                      </div>
                     </div>
                   ) : (
                     <div>
@@ -596,13 +630,13 @@ export default function CourseViewPage({ params }: { params: { id: string } }) {
               )}
 
               {hasPassedCurrentStep && !showResults && (
-                <div className="text-center">
+                <div className="text-center space-y-4">
                   <div className="p-6 bg-green-100 rounded-lg mb-6">
                     <h3 className="text-xl font-bold text-green-800">
                       ✓ Você já passou nesta avaliação!
                     </h3>
                   </div>
-                  <div className="flex gap-4 justify-center">
+                  <div className="flex flex-wrap gap-4 justify-center items-center">
                     {currentStepIndex > 0 && (
                       <button
                         onClick={handlePrevious}
@@ -611,12 +645,70 @@ export default function CourseViewPage({ params }: { params: { id: string } }) {
                         ← Step Anterior
                       </button>
                     )}
-                    <button
-                      onClick={handleContinue}
-                      className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold"
-                    >
-                      Continuar para próximo step →
-                    </button>
+                    {currentStepIndex === course.steps.length - 1 ? (
+                      progress?.completed ? (
+                        <button
+                          disabled
+                          className="px-6 py-3 bg-gray-400 text-white rounded-lg cursor-not-allowed font-semibold"
+                        >
+                          ✓ Curso Finalizado
+                        </button>
+                      ) : (
+                        <button
+                          onClick={handleContinue}
+                          className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold"
+                        >
+                          Finalizar Curso
+                        </button>
+                      )
+                    ) : (
+                      <button
+                        onClick={handleContinue}
+                        className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold"
+                      >
+                        Continuar para próximo step →
+                      </button>
+                    )}
+
+                    {/* Show linked playgrounds on last step - inline */}
+                    {currentStepIndex === course.steps.length - 1 &&
+                      linkedPlaygrounds.map((playground) => (
+                        <button
+                          key={playground.id}
+                          onClick={() =>
+                            router.push(`/playground/${playground.id}`)
+                          }
+                          className="group relative px-6 py-3 text-white rounded-lg font-bold overflow-hidden transition-all duration-300 hover:scale-105 hover:shadow-2xl"
+                          style={{
+                            background:
+                              "linear-gradient(45deg, #3b82f6, #ef4444, #1e3a8a)",
+                            backgroundSize: "200% 200%",
+                            animation: "gradient 3s ease infinite",
+                          }}
+                        >
+                          <style jsx>{`
+                            @keyframes gradient {
+                              0% {
+                                background-position: 0% 50%;
+                              }
+                              50% {
+                                background-position: 100% 50%;
+                              }
+                              100% {
+                                background-position: 0% 50%;
+                              }
+                            }
+                          `}</style>
+                          <div className="absolute inset-0 backdrop-blur-sm bg-black/10"></div>
+                          <div className="relative flex items-center gap-2">
+                            <span className="text-xl">🎯</span>
+                            <span>{playground.name}</span>
+                            <span className="group-hover:translate-x-1 transition-transform">
+                              →
+                            </span>
+                          </div>
+                        </button>
+                      ))}
                   </div>
                 </div>
               )}
@@ -625,23 +717,81 @@ export default function CourseViewPage({ params }: { params: { id: string } }) {
 
           {/* Continue without evaluation */}
           {!currentStep.has_evaluation && (
-            <div className="flex gap-4 justify-center">
-              {currentStepIndex > 0 && (
-                <button
-                  onClick={handlePrevious}
-                  className="px-6 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 font-semibold"
-                >
-                  ← Step Anterior
-                </button>
-              )}
-              <button
-                onClick={handleContinue}
-                className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold"
-              >
-                {currentStepIndex === course.steps.length - 1
-                  ? "Finalizar Curso"
-                  : "Próximo Step →"}
-              </button>
+            <div className="space-y-4">
+              <div className="flex flex-wrap gap-4 justify-center items-center">
+                {currentStepIndex > 0 && (
+                  <button
+                    onClick={handlePrevious}
+                    className="px-6 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 font-semibold"
+                  >
+                    ← Step Anterior
+                  </button>
+                )}
+                {currentStepIndex === course.steps.length - 1 ? (
+                  progress?.completed ? (
+                    <button
+                      disabled
+                      className="px-6 py-3 bg-gray-400 text-white rounded-lg cursor-not-allowed font-semibold"
+                    >
+                      ✓ Curso Finalizado
+                    </button>
+                  ) : (
+                    <button
+                      onClick={handleContinue}
+                      className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold"
+                    >
+                      Finalizar Curso
+                    </button>
+                  )
+                ) : (
+                  <button
+                    onClick={handleContinue}
+                    className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold"
+                  >
+                    Próximo Step →
+                  </button>
+                )}
+
+                {/* Show linked playgrounds on last step - inline */}
+                {currentStepIndex === course.steps.length - 1 &&
+                  linkedPlaygrounds.map((playground) => (
+                    <button
+                      key={playground.id}
+                      onClick={() =>
+                        router.push(`/playground/${playground.id}`)
+                      }
+                      className="group relative px-6 py-3 text-white rounded-lg font-bold overflow-hidden transition-all duration-300 hover:scale-105 hover:shadow-2xl"
+                      style={{
+                        background:
+                          "linear-gradient(45deg, #3b82f6, #ef4444, #1e3a8a)",
+                        backgroundSize: "200% 200%",
+                        animation: "gradient 3s ease infinite",
+                      }}
+                    >
+                      <style jsx>{`
+                        @keyframes gradient {
+                          0% {
+                            background-position: 0% 50%;
+                          }
+                          50% {
+                            background-position: 100% 50%;
+                          }
+                          100% {
+                            background-position: 0% 50%;
+                          }
+                        }
+                      `}</style>
+                      <div className="absolute inset-0 backdrop-blur-sm bg-black/10"></div>
+                      <div className="relative flex items-center gap-2">
+                        <span className="text-xl">🎯</span>
+                        <span>{playground.name}</span>
+                        <span className="group-hover:translate-x-1 transition-transform">
+                          →
+                        </span>
+                      </div>
+                    </button>
+                  ))}
+              </div>
             </div>
           )}
         </div>
