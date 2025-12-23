@@ -71,11 +71,8 @@ router.get('/playgrounds/:id', adminOnly, async (req: Request, res: Response) =>
       return;
     }
 
-    // Verify ownership
-    if (playground.created_by !== req.user?.id) {
-      res.status(403).json({ error: 'Not authorized' });
-      return;
-    }
+    // Allow any admin to view playgrounds
+    // No ownership check needed for viewing
 
     const { data: models } = await db
       .from('model_configurations')
@@ -330,15 +327,15 @@ router.get('/playgrounds/:id/metrics', adminOnly, async (req: Request, res: Resp
   try {
     const { id } = req.params;
 
-    // Verify ownership
+    // Verify playground exists (any admin can access)
     const { data: playground, error: checkError } = await db
       .from('playgrounds')
-      .select('created_by')
+      .select('id')
       .eq('id', id)
       .single();
 
-    if (checkError || !playground || playground.created_by !== req.user?.id) {
-      res.status(403).json({ error: 'Not authorized' });
+    if (checkError || !playground) {
+      res.status(404).json({ error: 'Playground not found' });
       return;
     }
 
@@ -515,15 +512,15 @@ router.get('/playgrounds/:id/evaluations/:sessionId', adminOnly, async (req: Req
   try {
     const { id: playgroundId, sessionId } = req.params;
 
-    // Verify ownership
+    // Verify playground exists (any admin can view evaluations)
     const { data: playground, error: checkError } = await db
       .from('playgrounds')
-      .select('created_by')
+      .select('id')
       .eq('id', playgroundId)
       .single();
 
-    if (checkError || !playground || playground.created_by !== req.user?.id) {
-      res.status(403).json({ error: 'Not authorized' });
+    if (checkError || !playground) {
+      res.status(404).json({ error: 'Playground not found' });
       return;
     }
 
