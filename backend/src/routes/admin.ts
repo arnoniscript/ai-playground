@@ -67,6 +67,7 @@ router.get('/playgrounds/:id', adminOnly, async (req: Request, res: Response) =>
       .single();
 
     if (playgroundError || !playground) {
+      console.error('Error fetching playground:', playgroundError);
       res.status(404).json({ error: 'Playground not found' });
       return;
     }
@@ -74,33 +75,45 @@ router.get('/playgrounds/:id', adminOnly, async (req: Request, res: Response) =>
     // Allow any admin to view playgrounds
     // No ownership check needed for viewing
 
-    const { data: models } = await db
+    const { data: models, error: modelsError } = await db
       .from('model_configurations')
       .select('*')
       .eq('playground_id', id);
 
-    const { data: questions } = await db
+    if (modelsError) {
+      console.error('Error fetching models:', modelsError);
+    }
+
+    const { data: questions, error: questionsError } = await db
       .from('questions')
       .select('*')
       .eq('playground_id', id)
       .order('order_index', { ascending: true });
 
-    const { data: counters } = await db
+    if (questionsError) {
+      console.error('Error fetching questions:', questionsError);
+    }
+
+    const { data: counters, error: countersError } = await db
       .from('evaluation_counters')
       .select('*')
       .eq('playground_id', id);
 
+    if (countersError) {
+      console.error('Error fetching counters:', countersError);
+    }
+
     res.json({
       data: {
         ...playground,
-        models,
-        questions,
-        counters,
+        models: models || [],
+        questions: questions || [],
+        counters: counters || [],
       },
     });
   } catch (error) {
     console.error('Error fetching playground:', error);
-    res.status(500).json({ error: 'Failed to fetch playground' });
+    res.status(500).json({ error: 'Failed to fetch playground', details: error instanceof Error ? error.message : 'Unknown error' });
   }
 });
 

@@ -16,7 +16,7 @@ export const CreatePlaygroundSchema = z.object({
   type: z.enum(['ab_testing', 'tuning']),
   description: z.string().optional(),
   support_text: z.string().optional(), // Can contain HTML
-  restricted_emails: z.array(z.string().email()).optional(),
+  restricted_emails: z.array(z.string().email()).optional().nullable(),
   evaluation_goal: z.number().int().positive().min(1),
   linked_course_id: z.string().uuid().optional().nullable(),
   course_required: z.boolean().optional().default(false),
