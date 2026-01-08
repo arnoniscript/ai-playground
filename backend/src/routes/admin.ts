@@ -3,6 +3,12 @@ import { db } from '../db/client.js';
 import { authMiddleware, adminOnly } from '../middleware/auth.js';
 import { CreatePlaygroundSchema, UpdatePlaygroundSchema } from '../schemas/index.js';
 import { v4 as uuidv4 } from 'uuid';
+import { 
+  authorizeUserForPlayground, 
+  removeUserAuthorizationFromPlayground,
+  getPlaygroundAuthorizedUsers 
+} from '../utils/playground-access.js';
+import { sendInviteEmail } from '../utils/email.js';
 
 const router = Router();
 
@@ -599,14 +605,15 @@ router.get('/playgrounds/:id/evaluations/:sessionId', adminOnly, async (req: Req
 
 /**
  * GET /admin/users
- * List all users (emails) for playground access control
+ * List all users with full details for user management
  */
 router.get('/users', adminOnly, async (req: Request, res: Response) => {
   try {
+    // Fetch all users
     const { data: users, error } = await db
       .from('users')
-      .select('id, email, role, created_at')
-      .order('email', { ascending: true });
+      .select('*')
+      .order('created_at', { ascending: false });
 
     if (error) {
       console.error('Error fetching users:', error);
@@ -614,10 +621,606 @@ router.get('/users', adminOnly, async (req: Request, res: Response) => {
       return;
     }
 
-    res.json({ data: users });
+    // Enrich with inviter/blocker info if those fields exist
+    const enrichedUsers = await Promise.all(
+      (users || []).map(async (user) => {
+        const enriched: any = { ...user };
+
+        // Fetch inviter info if invited_by exists
+        if (user.invited_by) {
+          const { data: inviter } = await db
+            .from('users')
+            .select('email, full_name')
+            .eq('id', user.invited_by)
+            .single();
+          
+          if (inviter) {
+            enriched.inviter = inviter;
+          }
+        }
+
+        // Fetch blocker info if blocked_by exists
+        if (user.blocked_by) {
+          const { data: blocker } = await db
+            .from('users')
+            .select('email, full_name')
+            .eq('id', user.blocked_by)
+            .single();
+          
+          if (blocker) {
+            enriched.blocker = blocker;
+          }
+        }
+
+        return enriched;
+      })
+    );
+
+    res.json({ data: enrichedUsers });
   } catch (error) {
     console.error('Error in GET /admin/users:', error);
     res.status(500).json({ error: 'Failed to fetch users' });
+  }
+});
+
+/**
+ * PUT /admin/users/:id
+ * Update user details (admin only)
+ * Cannot change email
+ */
+router.put('/users/:id', adminOnly, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { full_name, role } = req.body;
+
+    // Verify user exists
+    const { data: existingUser, error: userError } = await db
+      .from('users')
+      .select('id, email')
+      .eq('id', id)
+      .single();
+
+    if (userError || !existingUser) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+
+    // Update user (email cannot be changed)
+    const updateData: any = {
+      updated_at: new Date().toISOString(),
+    };
+
+    if (full_name !== undefined) updateData.full_name = full_name;
+    if (role !== undefined) {
+      // Validate role
+      if (!['admin', 'tester', 'client'].includes(role)) {
+        res.status(400).json({ error: 'Invalid role' });
+        return;
+      }
+      updateData.role = role;
+    }
+
+    const { data: updatedUser, error: updateError } = await db
+      .from('users')
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (updateError) {
+      console.error('Error updating user:', updateError);
+      res.status(500).json({ error: 'Failed to update user' });
+      return;
+    }
+
+    res.json({ 
+      message: 'User updated successfully',
+      data: updatedUser 
+    });
+  } catch (error) {
+    console.error('Error in PUT /admin/users/:id:', error);
+    res.status(500).json({ error: 'Failed to update user' });
+  }
+});
+
+/**
+ * POST /admin/users/invite
+ * Invite a new user (creates pending user and sends OTP)
+ */
+router.post('/users/invite', adminOnly, async (req: Request, res: Response) => {
+  try {
+    const { email, role, full_name } = req.body;
+
+    if (!email) {
+      res.status(400).json({ error: 'Email is required' });
+      return;
+    }
+
+    // Validate role
+    if (role && !['admin', 'tester', 'client'].includes(role)) {
+      res.status(400).json({ error: 'Invalid role' });
+      return;
+    }
+
+    // Check if user already exists
+    const { data: existingUser } = await db
+      .from('users')
+      .select('id, email, status')
+      .eq('email', email)
+      .single();
+
+    if (existingUser) {
+      res.status(400).json({ 
+        error: 'User already exists',
+        user_status: existingUser.status 
+      });
+      return;
+    }
+
+    // Create pending user
+    const { data: newUser, error: insertError } = await db
+      .from('users')
+      .insert({
+        email,
+        full_name: full_name || null,
+        role: role || 'tester',
+        status: 'pending_invite',
+        invited_at: new Date().toISOString(),
+        invited_by: req.user!.id,
+      })
+      .select()
+      .single();
+
+    if (insertError) {
+      console.error('Error creating user:', insertError);
+      res.status(500).json({ error: 'Failed to create user' });
+      return;
+    }
+
+    // Send invitation email
+    const emailResult = await sendInviteEmail({
+      to: email,
+      inviterName: req.user!.full_name || req.user!.email,
+      fullName: full_name,
+    });
+
+    if (!emailResult.success) {
+      console.warn('Failed to send invitation email, but user was created:', emailResult.error);
+    }
+
+    res.json({ 
+      message: 'User invited successfully',
+      data: newUser,
+      email_sent: emailResult.success,
+      note: emailResult.success 
+        ? 'User will receive an invitation email to complete signup'
+        : 'User created but email could not be sent. User can still complete signup via login.'
+    });
+  } catch (error) {
+    console.error('Error in POST /admin/users/invite:', error);
+    res.status(500).json({ error: 'Failed to invite user' });
+  }
+});
+
+/**
+ * PUT /admin/users/:id/block
+ * Block a user (revoke all access)
+ */
+router.put('/users/:id/block', adminOnly, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+
+    // Verify user exists and is not already blocked
+    const { data: existingUser, error: userError } = await db
+      .from('users')
+      .select('id, email, status, role')
+      .eq('id', id)
+      .single();
+
+    if (userError || !existingUser) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+
+    // Cannot block yourself
+    if (existingUser.id === req.user!.id) {
+      res.status(400).json({ error: 'Cannot block yourself' });
+      return;
+    }
+
+    // Cannot block another admin (optional protection)
+    if (existingUser.role === 'admin') {
+      res.status(403).json({ error: 'Cannot block admin users' });
+      return;
+    }
+
+    if (existingUser.status === 'blocked') {
+      res.status(400).json({ error: 'User is already blocked' });
+      return;
+    }
+
+    // Block user
+    const { data: blockedUser, error: blockError } = await db
+      .from('users')
+      .update({
+        status: 'blocked',
+        blocked_at: new Date().toISOString(),
+        blocked_by: req.user!.id,
+        blocked_reason: reason || null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (blockError) {
+      console.error('Error blocking user:', blockError);
+      res.status(500).json({ error: 'Failed to block user' });
+      return;
+    }
+
+    res.json({ 
+      message: 'User blocked successfully',
+      data: blockedUser 
+    });
+  } catch (error) {
+    console.error('Error in PUT /admin/users/:id/block:', error);
+    res.status(500).json({ error: 'Failed to block user' });
+  }
+});
+
+/**
+ * PUT /admin/users/:id/unblock
+ * Unblock a user (restore access)
+ */
+router.put('/users/:id/unblock', adminOnly, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    // Verify user exists and is blocked
+    const { data: existingUser, error: userError } = await db
+      .from('users')
+      .select('id, email, status')
+      .eq('id', id)
+      .single();
+
+    if (userError || !existingUser) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+
+    if (existingUser.status !== 'blocked') {
+      res.status(400).json({ error: 'User is not blocked' });
+      return;
+    }
+
+    // Unblock user
+    const { data: unblockedUser, error: unblockError } = await db
+      .from('users')
+      .update({
+        status: 'active',
+        blocked_at: null,
+        blocked_by: null,
+        blocked_reason: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (unblockError) {
+      console.error('Error unblocking user:', unblockError);
+      res.status(500).json({ error: 'Failed to unblock user' });
+      return;
+    }
+
+    res.json({ 
+      message: 'User unblocked successfully',
+      data: unblockedUser 
+    });
+  } catch (error) {
+    console.error('Error in PUT /admin/users/:id/unblock:', error);
+    res.status(500).json({ error: 'Failed to unblock user' });
+  }
+});
+
+/**
+ * POST /admin/users/:id/resend-invite
+ * Resend invitation email to a pending user
+ */
+router.post('/users/:id/resend-invite', adminOnly, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    // Verify user exists and is pending
+    const { data: user, error: userError } = await db
+      .from('users')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (userError || !user) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+
+    if (user.status !== 'pending_invite') {
+      res.status(400).json({ error: 'User is not pending invite' });
+      return;
+    }
+
+    // Send invitation email
+    const emailResult = await sendInviteEmail({
+      to: user.email,
+      inviterName: req.user!.full_name || req.user!.email,
+      fullName: user.full_name,
+    });
+
+    if (!emailResult.success) {
+      res.status(500).json({ 
+        error: 'Failed to send invitation email',
+        details: emailResult.error 
+      });
+      return;
+    }
+
+    // Update invited_at timestamp
+    await db
+      .from('users')
+      .update({
+        invited_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id);
+
+    res.json({ 
+      message: 'Invitation email resent successfully',
+      email_sent: true 
+    });
+  } catch (error) {
+    console.error('Error in POST /admin/users/:id/resend-invite:', error);
+    res.status(500).json({ error: 'Failed to resend invitation' });
+  }
+});
+
+/**
+ * DELETE /admin/users/:id/cancel-invite
+ * Cancel a pending invitation (delete the user)
+ */
+router.delete('/users/:id/cancel-invite', adminOnly, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    // Verify user exists and is pending
+    const { data: user, error: userError } = await db
+      .from('users')
+      .select('id, email, status')
+      .eq('id', id)
+      .single();
+
+    if (userError || !user) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+
+    if (user.status !== 'pending_invite') {
+      res.status(400).json({ error: 'Can only cancel pending invitations' });
+      return;
+    }
+
+    // Delete the user
+    const { error: deleteError } = await db
+      .from('users')
+      .delete()
+      .eq('id', id);
+
+    if (deleteError) {
+      console.error('Error deleting user:', deleteError);
+      res.status(500).json({ error: 'Failed to cancel invitation' });
+      return;
+    }
+
+    res.json({ 
+      message: 'Invitation cancelled successfully',
+      deleted_email: user.email 
+    });
+  } catch (error) {
+    console.error('Error in DELETE /admin/users/:id/cancel-invite:', error);
+    res.status(500).json({ error: 'Failed to cancel invitation' });
+  }
+});
+
+/**
+ * GET /admin/playgrounds/:id/authorized-users
+ * Get list of users authorized to access a specific playground
+ */
+router.get('/playgrounds/:id/authorized-users', adminOnly, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    // Verify playground exists
+    const { data: playground, error: pgError } = await db
+      .from('playgrounds')
+      .select('id, name, access_control_type')
+      .eq('id', id)
+      .single();
+
+    if (pgError || !playground) {
+      res.status(404).json({ error: 'Playground not found' });
+      return;
+    }
+
+    const authorizedUsers = await getPlaygroundAuthorizedUsers(id);
+
+    res.json({ 
+      data: {
+        playground,
+        authorized_users: authorizedUsers
+      }
+    });
+  } catch (error) {
+    console.error('Error in GET /admin/playgrounds/:id/authorized-users:', error);
+    res.status(500).json({ error: 'Failed to fetch authorized users' });
+  }
+});
+
+/**
+ * POST /admin/playgrounds/:id/authorized-users
+ * Add a user to the authorized users list for a playground
+ * Body: { user_id: string, notes?: string }
+ */
+router.post('/playgrounds/:id/authorized-users', adminOnly, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { user_id, notes } = req.body;
+
+    if (!user_id) {
+      res.status(400).json({ error: 'user_id is required' });
+      return;
+    }
+
+    // Verify playground exists
+    const { data: playground, error: pgError } = await db
+      .from('playgrounds')
+      .select('id, name')
+      .eq('id', id)
+      .single();
+
+    if (pgError || !playground) {
+      res.status(404).json({ error: 'Playground not found' });
+      return;
+    }
+
+    // Verify user exists
+    const { data: user, error: userError } = await db
+      .from('users')
+      .select('id, email, role')
+      .eq('id', user_id)
+      .single();
+
+    if (userError || !user) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+
+    // Add authorization
+    const result = await authorizeUserForPlayground(
+      id,
+      user_id,
+      req.user!.id,
+      notes
+    );
+
+    if (!result.success) {
+      res.status(400).json({ error: result.error });
+      return;
+    }
+
+    res.json({ 
+      message: 'User authorized successfully',
+      data: {
+        playground_id: id,
+        playground_name: playground.name,
+        user_id: user.id,
+        user_email: user.email
+      }
+    });
+  } catch (error) {
+    console.error('Error in POST /admin/playgrounds/:id/authorized-users:', error);
+    res.status(500).json({ error: 'Failed to authorize user' });
+  }
+});
+
+/**
+ * DELETE /admin/playgrounds/:id/authorized-users/:userId
+ * Remove a user from the authorized users list for a playground
+ */
+router.delete('/playgrounds/:id/authorized-users/:userId', adminOnly, async (req: Request, res: Response) => {
+  try {
+    const { id, userId } = req.params;
+
+    // Verify playground exists
+    const { data: playground, error: pgError } = await db
+      .from('playgrounds')
+      .select('id, name')
+      .eq('id', id)
+      .single();
+
+    if (pgError || !playground) {
+      res.status(404).json({ error: 'Playground not found' });
+      return;
+    }
+
+    // Remove authorization
+    const result = await removeUserAuthorizationFromPlayground(id, userId);
+
+    if (!result.success) {
+      res.status(400).json({ error: result.error });
+      return;
+    }
+
+    res.json({ 
+      message: 'User authorization removed successfully',
+      data: {
+        playground_id: id,
+        user_id: userId
+      }
+    });
+  } catch (error) {
+    console.error('Error in DELETE /admin/playgrounds/:id/authorized-users/:userId:', error);
+    res.status(500).json({ error: 'Failed to remove user authorization' });
+  }
+});
+
+/**
+ * PUT /admin/playgrounds/:id/access-control
+ * Update the access control type for a playground
+ * Body: { access_control_type: 'open' | 'email_restricted' | 'explicit_authorization' }
+ */
+router.put('/playgrounds/:id/access-control', adminOnly, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { access_control_type } = req.body;
+
+    if (!access_control_type) {
+      res.status(400).json({ error: 'access_control_type is required' });
+      return;
+    }
+
+    const validTypes = ['open', 'email_restricted', 'explicit_authorization'];
+    if (!validTypes.includes(access_control_type)) {
+      res.status(400).json({ 
+        error: 'Invalid access_control_type',
+        valid_types: validTypes 
+      });
+      return;
+    }
+
+    // Update playground
+    const { data: playground, error } = await db
+      .from('playgrounds')
+      .update({ 
+        access_control_type,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error || !playground) {
+      console.error('Error updating playground:', error);
+      res.status(500).json({ error: 'Failed to update access control type' });
+      return;
+    }
+
+    res.json({ 
+      message: 'Access control type updated successfully',
+      data: playground
+    });
+  } catch (error) {
+    console.error('Error in PUT /admin/playgrounds/:id/access-control:', error);
+    res.status(500).json({ error: 'Failed to update access control type' });
   }
 });
 

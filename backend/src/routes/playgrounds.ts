@@ -3,6 +3,7 @@ import { db } from '../db/client.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { SubmitEvaluationSchema } from '../schemas/index.js';
 import { v4 as uuidv4 } from 'uuid';
+import { getUserAccessiblePlaygrounds, userHasPlaygroundAccess } from '../utils/playground-access.js';
 
 const router = Router();
 
@@ -10,16 +11,27 @@ router.use(authMiddleware);
 
 /**
  * GET /playgrounds
- * List available playgrounds for the current tester
+ * List available playgrounds for the current user based on their role and authorizations
  */
 router.get('/', async (req: Request, res: Response) => {
   try {
-    const userEmail = req.user?.email;
+    const userId = req.user!.id;
+    const userRole = req.user!.role;
+    const userEmail = req.user!.email;
 
-    // Get active playgrounds
+    // Get accessible playground IDs for this user
+    const accessibleIds = await getUserAccessiblePlaygrounds(userId, userRole, userEmail);
+
+    if (accessibleIds.length === 0) {
+      res.json({ data: [] });
+      return;
+    }
+
+    // Fetch full playground data
     const { data: playgrounds, error } = await db
       .from('playgrounds')
       .select('*')
+      .in('id', accessibleIds)
       .eq('is_active', true)
       .order('created_at', { ascending: false });
 
@@ -29,17 +41,9 @@ router.get('/', async (req: Request, res: Response) => {
       return;
     }
 
-    // Filter by restricted emails if applicable
-    const availablePlaygrounds = (playgrounds || []).filter(pg => {
-      if (!pg.restricted_emails || pg.restricted_emails.length === 0) {
-        return true; // Available to all
-      }
-      return pg.restricted_emails.includes(userEmail);
-    });
-
     // Fetch counters for each playground
     const playgroundsWithCounters = await Promise.all(
-      availablePlaygrounds.map(async (playground) => {
+      (playgrounds || []).map(async (playground) => {
         const { data: counters } = await db
           .from('evaluation_counters')
           .select('*')
@@ -66,8 +70,9 @@ router.get('/', async (req: Request, res: Response) => {
 router.get('/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const userEmail = req.user?.email;
     const userId = req.user!.id;
+    const userRole = req.user!.role;
+    const userEmail = req.user!.email;
 
     const { data: playground, error } = await db
       .from('playgrounds')
@@ -82,12 +87,15 @@ router.get('/:id', async (req: Request, res: Response) => {
       return;
     }
 
-    // Check access restrictions
-    if (playground.restricted_emails && playground.restricted_emails.length > 0) {
-      if (!playground.restricted_emails.includes(userEmail)) {
-        res.status(403).json({ error: 'Access denied' });
-        return;
-      }
+    // Check if user has access to this playground
+    const accessCheck = await userHasPlaygroundAccess(userId, id, userRole, userEmail);
+    
+    if (!accessCheck.hasAccess) {
+      res.status(403).json({ 
+        error: 'Access denied',
+        reason: accessCheck.reason 
+      });
+      return;
     }
 
     // Check course requirement
@@ -168,6 +176,9 @@ router.post('/:id/evaluations', async (req: Request, res: Response) => {
   try {
     const { id: playgroundId } = req.params;
     const payload = SubmitEvaluationSchema.parse(req.body);
+    const userId = req.user!.id;
+    const userRole = req.user!.role;
+    const userEmail = req.user!.email;
 
     // Verify playground exists and is active
     const { data: playground, error: pgError } = await db
@@ -182,12 +193,15 @@ router.post('/:id/evaluations', async (req: Request, res: Response) => {
       return;
     }
 
-    // Check access restrictions
-    if (playground.restricted_emails && playground.restricted_emails.length > 0) {
-      if (!playground.restricted_emails.includes(req.user?.email)) {
-        res.status(403).json({ error: 'Access denied' });
-        return;
-      }
+    // Check if user has access to this playground
+    const accessCheck = await userHasPlaygroundAccess(userId, playgroundId, userRole, userEmail);
+    
+    if (!accessCheck.hasAccess) {
+      res.status(403).json({ 
+        error: 'Access denied',
+        reason: accessCheck.reason 
+      });
+      return;
     }
 
     // Check if model still has evaluations available

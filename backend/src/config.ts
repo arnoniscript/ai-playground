@@ -18,6 +18,13 @@ export const config = {
   cors: {
     origin: (process.env.CORS_ORIGIN || 'http://localhost:3000').split(','),
   },
+  email: {
+    resendApiKey: process.env.RESEND_API_KEY || '',
+    from: process.env.EMAIL_FROM || 'onboarding@resend.dev',
+  },
+  frontend: {
+    url: process.env.FRONTEND_URL || 'http://localhost:3000',
+  },
 };
 
 export function validateConfig() {

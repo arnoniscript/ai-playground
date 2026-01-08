@@ -10,7 +10,8 @@ import { Playground } from "@/lib/types";
 interface AvailableUser {
   id: string;
   email: string;
-  role: "admin" | "tester";
+  full_name?: string;
+  role: "admin" | "tester" | "client";
 }
 
 export default function EditPlaygroundPage() {
@@ -25,10 +26,14 @@ export default function EditPlaygroundPage() {
   const [isPrivate, setIsPrivate] = useState(false);
   const [selectedEmails, setSelectedEmails] = useState<string[]>([]);
   const [availableUsers, setAvailableUsers] = useState<AvailableUser[]>([]);
+  const [authorizedClients, setAuthorizedClients] = useState<any[]>([]);
+  const [loadingAuthorizedClients, setLoadingAuthorizedClients] =
+    useState(false);
 
   useEffect(() => {
     fetchPlayground();
     fetchAvailableUsers();
+    fetchAuthorizedClients();
   }, [playgroundId]);
 
   const fetchPlayground = async () => {
@@ -56,6 +61,52 @@ export default function EditPlaygroundPage() {
       setAvailableUsers(response.data.data || []);
     } catch (err) {
       console.error("Failed to fetch users:", err);
+    }
+  };
+
+  const fetchAuthorizedClients = async () => {
+    try {
+      setLoadingAuthorizedClients(true);
+      const response = await api.get(
+        `/admin/playgrounds/${playgroundId}/authorized-users`
+      );
+      // A API retorna { data: { playground, authorized_users } }
+      const authorizedUsers = response.data.data?.authorized_users || [];
+      setAuthorizedClients(
+        Array.isArray(authorizedUsers) ? authorizedUsers : []
+      );
+    } catch (err) {
+      console.error("Failed to fetch authorized clients:", err);
+      setAuthorizedClients([]); // Definir array vazio em caso de erro
+    } finally {
+      setLoadingAuthorizedClients(false);
+    }
+  };
+
+  const handleAuthorizeClient = async (userId: string) => {
+    try {
+      await api.post(`/admin/playgrounds/${playgroundId}/authorized-users`, {
+        user_id: userId,
+        notes: "Autorizado via edição de playground",
+      });
+      setSuccessMessage("Client autorizado com sucesso!");
+      await fetchAuthorizedClients();
+    } catch (err: any) {
+      setError(err.response?.data?.error || "Erro ao autorizar client");
+    }
+  };
+
+  const handleRemoveClientAuthorization = async (userId: string) => {
+    if (!confirm("Remover autorização deste client?")) return;
+
+    try {
+      await api.delete(
+        `/admin/playgrounds/${playgroundId}/authorized-users/${userId}`
+      );
+      setSuccessMessage("Autorização removida com sucesso!");
+      await fetchAuthorizedClients();
+    } catch (err: any) {
+      setError(err.response?.data?.error || "Erro ao remover autorização");
     }
   };
 
@@ -385,6 +436,139 @@ export default function EditPlaygroundPage() {
                         </div>
                       )}
                     </div>
+                  </div>
+
+                  {/* Authorized Clients Section */}
+                  <div className="pt-4 border-t">
+                    <h3 className="text-md font-semibold mb-2">
+                      👥 Clients Autorizados
+                    </h3>
+                    <p className="text-sm text-gray-600 mb-4">
+                      Gerencie quais clients têm acesso a este playground.{" "}
+                      <strong>
+                        Funciona mesmo com playground público - Clients somente
+                        tem acesso a playgrounds expressamente vinculados a
+                        eles, mesmo que sejam públicos.
+                      </strong>
+                    </p>
+
+                    {loadingAuthorizedClients ? (
+                      <div className="text-sm text-gray-500 py-4">
+                        Carregando clients...
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {/* Lista unificada de clients */}
+                        {availableUsers.filter((u) => u.role === "client")
+                          .length > 0 ? (
+                          <div className="border rounded-lg max-h-96 overflow-y-auto">
+                            <p className="text-sm font-medium p-3 bg-gray-50 border-b sticky top-0">
+                              Clients Cadastrados (
+                              {
+                                availableUsers.filter(
+                                  (u) => u.role === "client"
+                                ).length
+                              }{" "}
+                              total |{" "}
+                              {
+                                authorizedClients.filter(
+                                  (auth) => auth.user?.role === "client"
+                                ).length
+                              }{" "}
+                              autorizados)
+                            </p>
+                            {availableUsers
+                              .filter((u) => u.role === "client")
+                              .map((client) => {
+                                const isAuthorized = authorizedClients.some(
+                                  (auth) => auth.user_id === client.id
+                                );
+                                const authInfo = authorizedClients.find(
+                                  (auth) => auth.user_id === client.id
+                                );
+
+                                return (
+                                  <div
+                                    key={client.id}
+                                    className={`flex items-center justify-between p-3 border-b last:border-b-0 ${
+                                      isAuthorized
+                                        ? "bg-green-50"
+                                        : "hover:bg-gray-50"
+                                    }`}
+                                  >
+                                    <div className="flex-1">
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-sm font-medium">
+                                          {client.full_name || client.email}
+                                        </span>
+                                        <span className="text-xs bg-gray-100 text-gray-800 px-2 py-0.5 rounded">
+                                          client
+                                        </span>
+                                        {isAuthorized && (
+                                          <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">
+                                            ✓ Autorizado
+                                          </span>
+                                        )}
+                                      </div>
+                                      {client.full_name && (
+                                        <p className="text-xs text-gray-500">
+                                          {client.email}
+                                        </p>
+                                      )}
+                                      {isAuthorized && authInfo && (
+                                        <div className="text-xs text-gray-500 mt-1 space-y-0.5">
+                                          {authInfo.notes && (
+                                            <p>📝 {authInfo.notes}</p>
+                                          )}
+                                          <p className="text-gray-400">
+                                            Autorizado em{" "}
+                                            {new Date(
+                                              authInfo.authorized_at
+                                            ).toLocaleDateString("pt-BR")}
+                                          </p>
+                                        </div>
+                                      )}
+                                    </div>
+                                    <button
+                                      onClick={() =>
+                                        isAuthorized
+                                          ? handleRemoveClientAuthorization(
+                                              client.id
+                                            )
+                                          : handleAuthorizeClient(client.id)
+                                      }
+                                      className={`ml-4 px-3 py-1 text-sm rounded ${
+                                        isAuthorized
+                                          ? "bg-red-600 text-white hover:bg-red-700"
+                                          : "bg-blue-600 text-white hover:bg-blue-700"
+                                      }`}
+                                    >
+                                      {isAuthorized ? "Remover" : "Autorizar"}
+                                    </button>
+                                  </div>
+                                );
+                              })}
+                          </div>
+                        ) : (
+                          <div className="text-sm text-gray-500 bg-gray-50 p-4 rounded border">
+                            <p className="font-medium mb-1">
+                              Nenhum client cadastrado ainda.
+                            </p>
+                            <p className="text-xs">
+                              Convide clients através do{" "}
+                              <a
+                                href="/admin/users"
+                                className="text-blue-600 hover:underline"
+                                target="_blank"
+                              >
+                                menu de gerenciamento de usuários
+                              </a>
+                              .
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   <button

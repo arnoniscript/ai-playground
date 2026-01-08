@@ -1,11 +1,21 @@
-export type UserRole = 'admin' | 'tester';
+export type UserRole = 'admin' | 'tester' | 'client';
+export type UserStatus = 'active' | 'pending_invite' | 'blocked';
+export type AccessControlType = 'open' | 'email_restricted' | 'explicit_authorization';
 
 export interface User {
   id: string;
   email: string;
   full_name: string | null;
   role: UserRole;
+  status: UserStatus;
+  invited_at: string | null;
+  invited_by: string | null;
+  blocked_at: string | null;
+  blocked_by: string | null;
+  blocked_reason: string | null;
   created_at: string;
+  updated_at?: string;
+  last_login?: string | null;
 }
 
 export interface Playground {
@@ -17,6 +27,7 @@ export interface Playground {
   created_by: string;
   is_active: boolean;
   restricted_emails: string[] | null;
+  access_control_type: AccessControlType;
   evaluation_goal: number;
   linked_course_id: string | null;
   course_required: boolean;
@@ -71,6 +82,25 @@ export interface EvaluationCounter {
   current_count: number;
   created_at: string;
   updated_at: string;
+}
+
+export interface PlaygroundAuthorizedUser {
+  id: string;
+  playground_id: string;
+  user_id: string;
+  authorized_by: string | null;
+  authorized_at: string;
+  notes: string | null;
+  user?: {
+    id: string;
+    email: string;
+    full_name: string | null;
+    role: UserRole;
+  };
+  authorizer?: {
+    email: string;
+    full_name: string | null;
+  };
 }
 
 export interface Evaluation {

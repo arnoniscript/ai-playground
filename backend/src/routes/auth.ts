@@ -22,28 +22,63 @@ const otpStore: Record<string, { code: string; expiresAt: number }> = {};
 router.post('/signup', asyncHandler(async (req: Request, res: Response) => {
   const { email } = SignupRequestSchema.parse(req.body);
 
-  // Validate email domain
-  if (!validateEmailDomain(email)) {
-    res.status(400).json({
-      error: `Email must be from domain ${config.auth.allowedEmailDomain}`,
-    });
-    return;
-  }
+  const isMarisaDomain = validateEmailDomain(email);
 
-  // Check if user exists or create
+  // Check if user exists in database
   let user = await db
     .from('users')
     .select('*')
     .eq('email', email)
     .single();
 
-  if (!user.data) {
-    // Create new user
+  // Rule 1: If NOT from marisa.care domain AND NOT in database → BLOCK
+  if (!isMarisaDomain && !user.data) {
+    res.status(403).json({
+      error: 'Access denied',
+      message: `Only users from ${config.auth.allowedEmailDomain} domain or invited users can access this platform.`,
+    });
+    return;
+  }
+
+  // Rule 2: If NOT from marisa.care BUT exists in database (invited) → USE DATABASE ROLE
+  if (!isMarisaDomain && user.data) {
+    // User was invited, check if status allows access
+    if (user.data.status === 'blocked') {
+      const reasonMessage = user.data.blocked_reason 
+        ? `Motivo: ${user.data.blocked_reason}` 
+        : 'Entre em contato com um administrador.';
+      
+      res.status(403).json({
+        error: 'Conta bloqueada',
+        message: `Sua conta foi bloqueada. ${reasonMessage}`,
+        blocked_at: user.data.blocked_at,
+        blocked_reason: user.data.blocked_reason
+      });
+      return;
+    }
+
+    // Update status from pending_invite to active
+    if (user.data.status === 'pending_invite') {
+      await db
+        .from('users')
+        .update({ status: 'active' })
+        .eq('id', user.data.id);
+      
+      user.data.status = 'active';
+    }
+
+    // Continue with existing user (keep their assigned role)
+  }
+
+  // Rule 3: If from marisa.care domain → AUTO-CREATE as TESTER
+  if (isMarisaDomain && !user.data) {
+    // Create new user with tester role
     const { data: newUser, error } = await db
       .from('users')
       .insert({
         email,
-        role: 'tester', // Default role
+        role: 'tester',
+        status: 'active',
       })
       .select()
       .single();

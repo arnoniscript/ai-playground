@@ -1,18 +1,28 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import api from "@/lib/api";
 import { useAuthStore } from "@/lib/auth-store";
 
 export function LoginForm() {
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [otp, setOtp] = useState("");
   const [step, setStep] = useState<"email" | "otp">("email");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isInvited, setIsInvited] = useState(false);
   const router = useRouter();
   const setAuth = useAuthStore((state) => state.setAuth);
+
+  useEffect(() => {
+    const emailParam = searchParams.get("email");
+    if (emailParam) {
+      setEmail(emailParam);
+      setIsInvited(true);
+    }
+  }, [searchParams]);
 
   const handleSendOTP = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -23,7 +33,12 @@ export function LoginForm() {
       await api.post("/auth/signup", { email });
       setStep("otp");
     } catch (err: any) {
-      setError(err.response?.data?.error || "Failed to send OTP");
+      // Exibir mensagem detalhada do backend (inclui motivo do bloqueio)
+      const errorMessage =
+        err.response?.data?.message ||
+        err.response?.data?.error ||
+        "Failed to send OTP";
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -40,7 +55,12 @@ export function LoginForm() {
       setAuth(user, token);
       router.push("/dashboard");
     } catch (err: any) {
-      setError(err.response?.data?.error || "Invalid OTP");
+      // Exibir mensagem detalhada do backend (inclui motivo do bloqueio)
+      const errorMessage =
+        err.response?.data?.message ||
+        err.response?.data?.error ||
+        "Invalid OTP";
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -48,7 +68,22 @@ export function LoginForm() {
 
   return (
     <div className="w-full max-w-sm p-6 bg-white rounded-lg shadow-md">
-      <h1 className="text-2xl font-bold mb-6">AI Marisa Playground</h1>
+      <h1 className="text-2xl font-bold mb-2">AI Marisa Playground</h1>
+
+      {isInvited && step === "email" && (
+        <div className="mb-4 p-3 bg-blue-50 text-blue-800 rounded-md border border-blue-200">
+          <p className="text-sm font-medium">🎉 Bem-vindo!</p>
+          <p className="text-sm mt-1">
+            Complete seu cadastro para acessar a plataforma.
+          </p>
+        </div>
+      )}
+
+      <p className="text-gray-600 mb-6 text-sm">
+        {step === "email"
+          ? "Digite seu email para receber o código de acesso"
+          : "Digite o código enviado para seu email"}
+      </p>
 
       {step === "email" ? (
         <form onSubmit={handleSendOTP}>

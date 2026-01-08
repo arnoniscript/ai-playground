@@ -59,6 +59,9 @@ function CreatePlaygroundForm() {
   const [selectedEmails, setSelectedEmails] = useState<string[]>([]);
   const [availableUsers, setAvailableUsers] = useState<any[]>([]);
 
+  // Authorized clients (independent of private/public)
+  const [authorizedClientIds, setAuthorizedClientIds] = useState<string[]>([]);
+
   // Models
   const [models, setModels] = useState<ModelInput[]>([
     { key: "", embedCode: "" },
@@ -316,6 +319,23 @@ function CreatePlaygroundForm() {
 
       const playgroundId = playgroundResponse.data.data.id;
 
+      // Authorize selected clients (independent of private/public status)
+      if (authorizedClientIds.length > 0) {
+        try {
+          await Promise.all(
+            authorizedClientIds.map((userId) =>
+              api.post(`/admin/playgrounds/${playgroundId}/authorized-users`, {
+                user_id: userId,
+                notes: "Autorizado durante criação do playground",
+              })
+            )
+          );
+        } catch (authError) {
+          console.error("Error authorizing clients:", authError);
+          // Continue even if authorization fails
+        }
+      }
+
       router.push(`/admin/playground/${playgroundId}`);
     } catch (err: any) {
       setError(err.response?.data?.error || "Erro ao criar playground");
@@ -569,6 +589,100 @@ function CreatePlaygroundForm() {
                       </p>
                     )}
                   </div>
+                )}
+              </div>
+            </section>
+
+            {/* Authorized Clients Section */}
+            <section className="bg-white border rounded-lg p-6">
+              <h2 className="text-xl font-semibold mb-4">
+                👥 Clients Autorizados (Opcional)
+              </h2>
+              <p className="text-sm text-gray-600 mb-4">
+                Selecione clients específicos que podem acessar este playground.{" "}
+                <strong>
+                  Funciona mesmo com playground público - Clients somente tem
+                  acesso a playgrounds expressamente vinculados a eles, mesmo
+                  que sejam públicos.
+                </strong>
+              </p>
+
+              <div className="space-y-4">
+                {availableUsers.filter((u) => u.role === "client").length ===
+                0 ? (
+                  <div className="text-sm text-gray-500 bg-gray-50 p-4 rounded border border-gray-200">
+                    <p className="font-medium mb-2">
+                      Nenhum client cadastrado ainda.
+                    </p>
+                    <p className="text-xs">
+                      Para autorizar clients específicos, primeiro convide-os
+                      através do{" "}
+                      <a
+                        href="/admin/users"
+                        className="text-blue-600 hover:underline"
+                        target="_blank"
+                      >
+                        menu de gerenciamento de usuários
+                      </a>
+                      .
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="border rounded-lg max-h-60 overflow-y-auto">
+                      {availableUsers
+                        .filter((u) => u.role === "client")
+                        .map((client) => (
+                          <label
+                            key={client.id}
+                            className="flex items-center space-x-3 p-3 hover:bg-gray-50 cursor-pointer border-b last:border-b-0"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={authorizedClientIds.includes(client.id)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setAuthorizedClientIds([
+                                    ...authorizedClientIds,
+                                    client.id,
+                                  ]);
+                                } else {
+                                  setAuthorizedClientIds(
+                                    authorizedClientIds.filter(
+                                      (id) => id !== client.id
+                                    )
+                                  );
+                                }
+                              }}
+                              className="w-4 h-4"
+                            />
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-medium">
+                                  {client.full_name || client.email}
+                                </span>
+                                <span className="text-xs bg-gray-100 text-gray-800 px-2 py-0.5 rounded">
+                                  client
+                                </span>
+                              </div>
+                              {client.full_name && (
+                                <span className="text-xs text-gray-500">
+                                  {client.email}
+                                </span>
+                              )}
+                            </div>
+                          </label>
+                        ))}
+                    </div>
+                    {authorizedClientIds.length > 0 && (
+                      <div className="bg-blue-50 border border-blue-200 rounded p-3">
+                        <p className="text-sm text-blue-800">
+                          ✓ {authorizedClientIds.length} client(s)
+                          selecionado(s) terão acesso a este playground
+                        </p>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             </section>

@@ -71,11 +71,18 @@ export default function AdminDashboard() {
                   Gerenciar playgrounds e métricas
                 </p>
               </div>
-              <Link href="/admin/create-playground">
-                <button className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-                  + Novo Playground
-                </button>
-              </Link>
+              <div className="flex gap-3">
+                <Link href="/admin/users">
+                  <button className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">
+                    👥 Usuários
+                  </button>
+                </Link>
+                <Link href="/admin/create-playground">
+                  <button className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                    + Novo Playground
+                  </button>
+                </Link>
+              </div>
             </div>
 
             {/* Filter Toggle */}
