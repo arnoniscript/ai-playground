@@ -6,3 +6,4 @@ export { ModelEmbed } from './model-embed';
 export { CourseModal } from './course-modal';
 export { CourseDrawer } from './course-drawer';
 export { PlaygroundAccessManager } from './playground-access-manager';
+export { NotificationBanner, NotificationModal } from './notifications';

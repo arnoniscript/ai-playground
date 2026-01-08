@@ -1,7 +1,7 @@
 // Shared types for the application
 
-export type UserRole = 'admin' | 'manager' | 'tester' | 'client';
-export type UserStatus = 'active' | 'pending_invite' | 'blocked';
+export type UserRole = 'admin' | 'manager' | 'tester' | 'client' | 'qa';
+export type UserStatus = 'active' | 'pending_invite' | 'blocked' | 'pending_approval';
 export type PlaygroundType = 'ab_testing' | 'tuning';
 export type QuestionType = 'select' | 'input_string';
 export type AccessControlType = 'open' | 'email_restricted' | 'explicit_authorization';

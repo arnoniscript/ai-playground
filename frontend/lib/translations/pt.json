@@ -1,0 +1,204 @@
+{
+  "common": {
+    "welcome": "Bem-vindo",
+    "login": "Entrar",
+    "logout": "Sair",
+    "save": "Salvar",
+    "cancel": "Cancelar",
+    "delete": "Excluir",
+    "edit": "Editar",
+    "create": "Criar",
+    "back": "Voltar",
+    "next": "Próximo",
+    "previous": "Anterior",
+    "submit": "Enviar",
+    "loading": "Carregando...",
+    "error": "Erro",
+    "success": "Sucesso",
+    "confirm": "Confirmar",
+    "yes": "Sim",
+    "no": "Não",
+    "search": "Buscar",
+    "filter": "Filtrar",
+    "close": "Fechar",
+    "view": "Visualizar",
+    "download": "Baixar"
+  },
+  "auth": {
+    "email": "Email",
+    "password": "Senha",
+    "signIn": "Entrar",
+    "signOut": "Sair",
+    "registerAsQA": "Cadastrar como QA",
+    "sendCode": "Enviar Código",
+    "verifyCode": "Verificar Código",
+    "enterOTP": "Digite o código enviado para seu email",
+    "invalidOTP": "Código inválido",
+    "accountBlocked": "Conta bloqueada"
+  },
+  "qa": {
+    "registration": {
+      "title": "Cadastro de QA",
+      "subtitle": "Junte-se à nossa equipe de Quality Assurance",
+      "step1": {
+        "title": "Selecione seu idioma principal",
+        "subtitle": "Escolha o idioma que você prefere usar na plataforma",
+        "portuguese": "Português",
+        "english": "Inglês",
+        "spanish": "Espanhol"
+      },
+      "step2": {
+        "title": "Dados Pessoais",
+        "fullName": "Nome Completo",
+        "email": "Email",
+        "birthDate": "Data de Nascimento",
+        "gender": "Gênero",
+        "selectGender": "Selecione o gênero",
+        "male": "Masculino",
+        "female": "Feminino",
+        "other": "Outro",
+        "preferNotToSay": "Prefiro não dizer",
+        "nationality": "Nacionalidade",
+        "phone": "Telefone"
+      },
+      "step3": {
+        "title": "Idiomas Secundários",
+        "subtitle": "Selecione outros idiomas que você fala (opcional)",
+        "selected": "Selecionados"
+      },
+      "step4": {
+        "title": "Documento de Identificação",
+        "subtitle": "Envie uma foto do seu documento oficial com foto",
+        "documentNumber": "Número do Documento",
+        "uploadDocument": "Enviar Foto do Documento"
+      },
+      "step5": {
+        "title": "Geolocalização",
+        "subtitle": "Precisamos capturar sua localização atual para verificar sua região",
+        "capture": "Capturar Localização",
+        "captured": "Localização capturada com sucesso",
+        "error": "Não foi possível capturar a localização",
+        "notSupported": "Seu navegador não suporta geolocalização"
+      },
+      "step6": {
+        "title": "Selfie de Verificação",
+        "subtitle": "Tire uma foto sua usando a câmera do computador",
+        "openCamera": "Abrir Câmera",
+        "takeSelfie": "Tirar Selfie",
+        "retake": "Tirar Novamente",
+        "cameraError": "Não foi possível acessar a câmera"
+      },
+      "step7": {
+        "title": "Formação Acadêmica",
+        "subtitle": "Adicione sua formação acadêmica (opcional)",
+        "education": "Formação",
+        "addEducation": "Adicionar Formação",
+        "remove": "Remover",
+        "degreeLevel": "Nível",
+        "highSchool": "Ensino Médio",
+        "associate": "Tecnólogo",
+        "bachelor": "Bacharel",
+        "master": "Mestrado",
+        "doctorate": "Doutorado",
+        "otherDegree": "Outro",
+        "institution": "Instituição",
+        "fieldOfStudy": "Área de Estudo",
+        "years": "Período",
+        "description": "Descrição"
+      },
+      "step8": {
+        "title": "Termos e Condições",
+        "termsTitle": "Termos de Uso e Política de Privacidade",
+        "termsContent": "Ao se cadastrar como QA na plataforma Marisa Care, você concorda em fornecer informações verdadeiras e precisas, manter a confidencialidade dos dados acessados durante os testes, seguir as diretrizes de qualidade estabelecidas, e autoriza o uso dos dados fornecidos para fins de verificação de identidade e gestão de acesso. Seus dados pessoais serão tratados de acordo com a LGPD e utilizados apenas para fins relacionados à sua atividade como QA.",
+        "acceptTerms": "Li e aceito os termos e condições"
+      },
+      "progress": "Progresso",
+      "previous": "Anterior",
+      "next": "Próximo",
+      "submit": "Enviar Cadastro",
+      "submitting": "Enviando...",
+      "errors": {
+        "fileTooLarge": "Arquivo muito grande (máximo 2MB)",
+        "invalidFile": "Arquivo inválido"
+      }
+    },
+    "pending": {
+      "title": "Cadastro em Análise",
+      "subtitle": "Seu cadastro foi recebido com sucesso!",
+      "timeline": {
+        "title": "O que acontece agora?",
+        "step1": "Cadastro recebido",
+        "step1Description": "Recebemos todas as suas informações",
+        "step2": "Análise em andamento",
+        "step2Description": "Nossa equipe está verificando seus dados",
+        "step3": "Resultado por email",
+        "step3Description": "Você receberá a resposta em até 3 dias úteis"
+      },
+      "email": {
+        "title": "Verifique seu email",
+        "description": "Enviamos uma confirmação para seu email"
+      },
+      "time": {
+        "title": "Prazo de análise",
+        "description": "Até 3 dias úteis"
+      },
+      "questions": "Dúvidas? Entre em contato:",
+      "backToHome": "Voltar para o início"
+    }
+  },
+  "admin": {
+    "dashboard": "Painel Administrativo",
+    "users": "Usuários",
+    "playgrounds": "Playgrounds",
+    "courses": "Cursos",
+    "qaManagement": "Gestão de QAs",
+    "notifications": "Notificações",
+    "qa": {
+      "pending": "Pendentes",
+      "approved": "Aprovados",
+      "rejected": "Recusados",
+      "approve": "Aprovar",
+      "reject": "Recusar",
+      "ban": "Banir",
+      "sendNotification": "Enviar Notificação",
+      "viewDetails": "Ver Detalhes",
+      "personalInfo": "Informações Pessoais",
+      "verification": "Verificação",
+      "education": "Formação Acadêmica",
+      "languages": "Idiomas",
+      "rejectionReason": "Motivo da Recusa"
+    },
+    "notifications": {
+      "create": "Criar Notificação",
+      "type": "Tipo",
+      "typeBanner": "Banner (Topo)",
+      "typeModal": "Modal (Centro)",
+      "typeEmail": "Email",
+      "title": "Título",
+      "message": "Mensagem",
+      "image": "Imagem (opcional)",
+      "targetType": "Destinatários",
+      "targetAll": "Todos os usuários",
+      "targetRole": "Por função",
+      "targetSpecific": "Usuários específicos",
+      "expiresAt": "Expira em",
+      "send": "Enviar Notificação"
+    }
+  },
+  "notifications": {
+    "dismiss": "Dispensar",
+    "understood": "Entendi"
+  },
+  "errors": {
+    "required": "Campo obrigatório",
+    "invalidEmail": "Email inválido",
+    "invalidPhone": "Telefone inválido",
+    "invalidDate": "Data inválida",
+    "fileTooLarge": "Arquivo muito grande",
+    "invalidFileType": "Tipo de arquivo inválido",
+    "uploadFailed": "Falha no upload",
+    "locationRequired": "Localização é obrigatória",
+    "selfieRequired": "Selfie é obrigatória",
+    "minAge": "Você deve ter pelo menos 18 anos"
+  }
+}

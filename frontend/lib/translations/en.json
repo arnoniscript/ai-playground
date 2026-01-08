@@ -1,0 +1,149 @@
+{
+  "common": {
+    "welcome": "Welcome",
+    "login": "Login",
+    "logout": "Logout",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "create": "Create",
+    "back": "Back",
+    "next": "Next",
+    "previous": "Previous",
+    "submit": "Submit",
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success",
+    "confirm": "Confirm",
+    "yes": "Yes",
+    "no": "No",
+    "search": "Search",
+    "filter": "Filter",
+    "close": "Close",
+    "view": "View",
+    "download": "Download"
+  },
+  "auth": {
+    "email": "Email",
+    "password": "Password",
+    "signIn": "Sign In",
+    "signOut": "Sign Out",
+    "registerAsQA": "Register as QA",
+    "sendCode": "Send Code",
+    "verifyCode": "Verify Code",
+    "enterOTP": "Enter the code sent to your email",
+    "invalidOTP": "Invalid code",
+    "accountBlocked": "Account blocked"
+  },
+  "qa": {
+    "registration": {
+      "title": "QA Registration",
+      "subtitle": "Join our Quality Assurance team",
+      "step1": {
+        "title": "Select your primary language",
+        "subtitle": "Choose the language you prefer to use on the platform",
+        "portuguese": "Portuguese",
+        "english": "English",
+        "spanish": "Spanish"
+      },
+      "step2": {
+        "title": "Personal Information",
+        "fullName": "Full Name",
+        "email": "Email",
+        "birthDate": "Birth Date",
+        "gender": "Gender",
+        "selectGender": "Select gender",
+        "male": "Male",
+        "female": "Female",
+        "other": "Other",
+        "preferNotToSay": "Prefer not to say",
+        "nationality": "Nationality",
+        "phone": "Phone"
+      },
+      "step3": {
+        "title": "Secondary Languages",
+        "subtitle": "Select other languages you speak (optional)",
+        "selected": "Selected"
+      },
+      "step4": {
+        "title": "Identification Document",
+        "subtitle": "Upload a photo of your official ID document with photo",
+        "documentNumber": "Document Number",
+        "uploadDocument": "Upload Document Photo"
+      },
+      "step5": {
+        "title": "Geolocation",
+        "subtitle": "We need to capture your current location to verify your region",
+        "capture": "Capture Location",
+        "captured": "Location captured successfully",
+        "error": "Could not capture location",
+        "notSupported": "Your browser does not support geolocation"
+      },
+      "step6": {
+        "title": "Verification Selfie",
+        "subtitle": "Take a photo of yourself using your computer's camera",
+        "openCamera": "Open Camera",
+        "takeSelfie": "Take Selfie",
+        "retake": "Retake",
+        "cameraError": "Could not access camera"
+      },
+      "step7": {
+        "title": "Academic Education",
+        "subtitle": "Add your academic background (optional)",
+        "education": "Education",
+        "addEducation": "Add Education",
+        "remove": "Remove",
+        "degreeLevel": "Level",
+        "highSchool": "High School",
+        "associate": "Associate Degree",
+        "bachelor": "Bachelor's Degree",
+        "master": "Master's Degree",
+        "doctorate": "Doctorate",
+        "otherDegree": "Other",
+        "institution": "Institution",
+        "fieldOfStudy": "Field of Study",
+        "years": "Period",
+        "description": "Description"
+      },
+      "step8": {
+        "title": "Terms and Conditions",
+        "termsTitle": "Terms of Use and Privacy Policy",
+        "termsContent": "By registering as a QA on the Marisa Care platform, you agree to provide true and accurate information, maintain confidentiality of data accessed during testing, follow established quality guidelines, and authorize the use of provided data for identity verification and access management purposes. Your personal data will be treated in accordance with LGPD and used only for purposes related to your activity as QA.",
+        "acceptTerms": "I have read and accept the terms and conditions"
+      },
+      "progress": "Progress",
+      "previous": "Previous",
+      "next": "Next",
+      "submit": "Submit Registration",
+      "submitting": "Submitting...",
+      "errors": {
+        "fileTooLarge": "File too large (maximum 2MB)",
+        "invalidFile": "Invalid file"
+      }
+    },
+    "pending": {
+      "title": "Registration Under Review",
+      "subtitle": "Your registration was received successfully!",
+      "timeline": {
+        "title": "What happens now?",
+        "step1": "Registration received",
+        "step1Description": "We received all your information",
+        "step2": "Analysis in progress",
+        "step2Description": "Our team is verifying your data",
+        "step3": "Result by email",
+        "step3Description": "You will receive the answer within 3 business days"
+      },
+      "email": {
+        "title": "Check your email",
+        "description": "We sent a confirmation to your email"
+      },
+      "time": {
+        "title": "Review period",
+        "description": "Up to 3 business days"
+      },
+      "questions": "Questions? Contact us:",
+      "backToHome": "Back to home"
+    }
+  }
+}

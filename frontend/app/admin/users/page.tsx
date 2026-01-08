@@ -19,7 +19,11 @@ export default function UserManagementPage() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showBlockModal, setShowBlockModal] = useState(false);
+  const [showQADetailsModal, setShowQADetailsModal] = useState(false);
+  const [showApproveModal, setShowApproveModal] = useState(false);
+  const [showRejectModal, setShowRejectModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [qaDetails, setQADetails] = useState<any>(null);
 
   // Form states
   const [editForm, setEditForm] = useState({
@@ -32,6 +36,8 @@ export default function UserManagementPage() {
     role: "tester" as UserRole,
   });
   const [blockReason, setBlockReason] = useState("");
+  const [rejectReason, setRejectReason] = useState("");
+  const [deleteUser, setDeleteUser] = useState(false);
 
   useEffect(() => {
     fetchUsers();
@@ -61,6 +67,30 @@ export default function UserManagementPage() {
     } catch (error: any) {
       console.error("Failed to update user:", error);
       alert(error.response?.data?.error || "Erro ao atualizar usuário");
+    }
+  };
+
+  const handleDeleteUser = async () => {
+    if (!selectedUser) return;
+
+    if (
+      !confirm(
+        `Tem certeza que deseja DELETAR permanentemente o usuário ${
+          selectedUser.full_name || selectedUser.email
+        }? Esta ação não pode ser desfeita.`
+      )
+    ) {
+      return;
+    }
+
+    try {
+      await api.delete(`/admin/users/${selectedUser.id}`);
+      alert("Usuário deletado com sucesso!");
+      setShowEditModal(false);
+      fetchUsers();
+    } catch (error: any) {
+      console.error("Failed to delete user:", error);
+      alert(error.response?.data?.error || "Erro ao deletar usuário");
     }
   };
 
@@ -149,6 +179,56 @@ export default function UserManagementPage() {
       });
   };
 
+  const handleViewQADetails = async (user: User) => {
+    try {
+      const response = await api.get(`/admin/users/${user.id}/qa-details`);
+      console.log("QA Details received:", response.data.data);
+      console.log("Document URL:", response.data.data.document_photo_url);
+      console.log("Selfie URL:", response.data.data.selfie_photo_url);
+      setQADetails(response.data.data);
+      setSelectedUser(user);
+      setShowQADetailsModal(true);
+    } catch (error: any) {
+      console.error("Failed to fetch QA details:", error);
+      alert(error.response?.data?.error || "Erro ao carregar detalhes do QA");
+    }
+  };
+
+  const handleApproveQA = async () => {
+    if (!selectedUser) return;
+
+    try {
+      await api.put(`/admin/users/${selectedUser.id}/approve-qa`);
+      alert("QA aprovado com sucesso!");
+      setShowApproveModal(false);
+      fetchUsers();
+    } catch (error: any) {
+      console.error("Failed to approve QA:", error);
+      alert(error.response?.data?.error || "Erro ao aprovar QA");
+    }
+  };
+
+  const handleRejectQA = async () => {
+    if (!selectedUser) return;
+
+    try {
+      await api.put(`/admin/users/${selectedUser.id}/reject-qa`, {
+        reason: rejectReason || undefined,
+        deleteUser: deleteUser,
+      });
+      alert(
+        deleteUser ? "QA deletado com sucesso!" : "QA recusado com sucesso!"
+      );
+      setShowRejectModal(false);
+      setRejectReason("");
+      setDeleteUser(false);
+      fetchUsers();
+    } catch (error: any) {
+      console.error("Failed to reject QA:", error);
+      alert(error.response?.data?.error || "Erro ao recusar QA");
+    }
+  };
+
   const openEditModal = (user: User) => {
     setSelectedUser(user);
     setEditForm({
@@ -162,6 +242,17 @@ export default function UserManagementPage() {
     setSelectedUser(user);
     setBlockReason("");
     setShowBlockModal(true);
+  };
+
+  const openApproveModal = (user: User) => {
+    setSelectedUser(user);
+    setShowApproveModal(true);
+  };
+
+  const openRejectModal = (user: User) => {
+    setSelectedUser(user);
+    setRejectReason("");
+    setShowRejectModal(true);
   };
 
   // Filter users
@@ -180,11 +271,13 @@ export default function UserManagementPage() {
       active: "bg-green-100 text-green-800",
       pending_invite: "bg-yellow-100 text-yellow-800",
       blocked: "bg-red-100 text-red-800",
+      pending_approval: "bg-blue-100 text-blue-800",
     };
     const labels = {
       active: "Ativo",
       pending_invite: "Convite Pendente",
       blocked: "Bloqueado",
+      pending_approval: "Aguardando Aprovação",
     };
     return (
       <span
@@ -200,6 +293,8 @@ export default function UserManagementPage() {
       admin: "bg-purple-100 text-purple-800",
       tester: "bg-blue-100 text-blue-800",
       client: "bg-gray-100 text-gray-800",
+      qa: "bg-indigo-100 text-indigo-800",
+      manager: "bg-pink-100 text-pink-800",
     };
     return (
       <span className={`px-2 py-1 text-xs font-medium rounded ${badges[role]}`}>
@@ -274,8 +369,10 @@ export default function UserManagementPage() {
               >
                 <option value="all">Todas as Roles</option>
                 <option value="admin">Admin</option>
+                <option value="manager">Manager</option>
                 <option value="tester">Tester</option>
                 <option value="client">Client</option>
+                <option value="qa">QA</option>
               </select>
               <select
                 value={statusFilter}
@@ -287,6 +384,7 @@ export default function UserManagementPage() {
                 <option value="all">Todos os Status</option>
                 <option value="active">Ativo</option>
                 <option value="pending_invite">Convite Pendente</option>
+                <option value="pending_approval">Aguardando Aprovação</option>
                 <option value="blocked">Bloqueado</option>
               </select>
             </div>
@@ -375,8 +473,42 @@ export default function UserManagementPage() {
                                   ❌ Cancelar
                                 </button>
                               </>
+                            ) : user.role === "qa" &&
+                              user.status === "pending_approval" ? (
+                              <>
+                                <button
+                                  onClick={() => handleViewQADetails(user)}
+                                  className="text-blue-600 hover:text-blue-900"
+                                  title="Ver detalhes do cadastro"
+                                >
+                                  👁️ Ver Detalhes
+                                </button>
+                                <button
+                                  onClick={() => openApproveModal(user)}
+                                  className="text-green-600 hover:text-green-900"
+                                  title="Aprovar QA"
+                                >
+                                  ✅ Aprovar
+                                </button>
+                                <button
+                                  onClick={() => openRejectModal(user)}
+                                  className="text-red-600 hover:text-red-900"
+                                  title="Recusar QA"
+                                >
+                                  ❌ Recusar
+                                </button>
+                              </>
                             ) : (
                               <>
+                                {user.role === "qa" && (
+                                  <button
+                                    onClick={() => handleViewQADetails(user)}
+                                    className="text-blue-600 hover:text-blue-900"
+                                    title="Ver detalhes do QA"
+                                  >
+                                    👁️ Detalhes
+                                  </button>
+                                )}
                                 <button
                                   onClick={() => openEditModal(user)}
                                   className="text-blue-600 hover:text-blue-900"
@@ -485,6 +617,22 @@ export default function UserManagementPage() {
                   Cancelar
                 </button>
               </div>
+
+              {/* Delete button for blocked QAs */}
+              {selectedUser.role === "qa" &&
+                selectedUser.status === "blocked" && (
+                  <div className="mt-4 pt-4 border-t border-gray-200">
+                    <button
+                      onClick={handleDeleteUser}
+                      className="w-full px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors flex items-center justify-center gap-2"
+                    >
+                      🗑️ Deletar Usuário Permanentemente
+                    </button>
+                    <p className="text-xs text-gray-500 mt-2 text-center">
+                      ⚠️ Esta ação permitirá que o email se cadastre novamente
+                    </p>
+                  </div>
+                )}
             </div>
           </div>
         )}
@@ -616,6 +764,437 @@ export default function UserManagementPage() {
                 <button
                   onClick={() => setShowBlockModal(false)}
                   className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* QA Details Modal */}
+        {showQADetailsModal && qaDetails && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+              <h2 className="text-2xl font-bold text-gray-900 mb-6">
+                📋 Detalhes do Cadastro QA
+              </h2>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Personal Info */}
+                <div className="space-y-4">
+                  <h3 className="font-semibold text-lg text-gray-900 border-b pb-2">
+                    Informações Pessoais
+                  </h3>
+                  <div>
+                    <span className="text-sm text-gray-600">Nome:</span>
+                    <p className="font-medium">{qaDetails.full_name}</p>
+                  </div>
+                  <div>
+                    <span className="text-sm text-gray-600">Email:</span>
+                    <p className="font-medium">{qaDetails.email}</p>
+                  </div>
+                  <div>
+                    <span className="text-sm text-gray-600">
+                      Data de Nascimento:
+                    </span>
+                    <p className="font-medium">
+                      {qaDetails.birth_date
+                        ? new Date(qaDetails.birth_date).toLocaleDateString(
+                            "pt-BR"
+                          )
+                        : "—"}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-sm text-gray-600">Gênero:</span>
+                    <p className="font-medium">{qaDetails.gender || "—"}</p>
+                  </div>
+                  <div>
+                    <span className="text-sm text-gray-600">
+                      Nacionalidade:
+                    </span>
+                    <p className="font-medium">
+                      {qaDetails.nationality || "—"}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-sm text-gray-600">Telefone:</span>
+                    <p className="font-medium">{qaDetails.phone || "—"}</p>
+                  </div>
+                  <div>
+                    <span className="text-sm text-gray-600">
+                      Idioma Principal:
+                    </span>
+                    <p className="font-medium">
+                      {qaDetails.primary_language || "—"}
+                    </p>
+                  </div>
+                  {qaDetails.secondary_languages &&
+                    qaDetails.secondary_languages.length > 0 && (
+                      <div>
+                        <span className="text-sm text-gray-600">
+                          Idiomas Secundários:
+                        </span>
+                        <p className="font-medium">
+                          {qaDetails.secondary_languages.join(", ")}
+                        </p>
+                      </div>
+                    )}
+                </div>
+
+                {/* Document Info */}
+                <div className="space-y-4">
+                  <h3 className="font-semibold text-lg text-gray-900 border-b pb-2">
+                    Documentação
+                  </h3>
+                  <div>
+                    <span className="text-sm text-gray-600">
+                      Número do Documento:
+                    </span>
+                    <p className="font-medium">
+                      {qaDetails.document_number || "—"}
+                    </p>
+                  </div>
+                  {qaDetails.document_photo_url && (
+                    <div>
+                      <span className="text-sm text-gray-600 block mb-2">
+                        Foto do Documento:
+                      </span>
+                      {qaDetails.document_photo_url.includes(
+                        "application/pdf"
+                      ) || qaDetails.document_photo_url.endsWith(".pdf") ? (
+                        <div className="space-y-2">
+                          <iframe
+                            src={qaDetails.document_photo_url}
+                            className="w-full h-96 rounded border border-gray-300"
+                            title="Document PDF"
+                          />
+                          <a
+                            href={qaDetails.document_photo_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-600 hover:text-blue-800 text-sm"
+                          >
+                            📄 Abrir PDF em nova aba
+                          </a>
+                        </div>
+                      ) : (
+                        <>
+                          <img
+                            src={qaDetails.document_photo_url}
+                            alt="Documento"
+                            className="max-w-full h-auto rounded border border-gray-300 cursor-pointer hover:opacity-90"
+                            onClick={() =>
+                              window.open(
+                                qaDetails.document_photo_url,
+                                "_blank"
+                              )
+                            }
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              target.style.display = "none";
+                              const parent = target.parentElement;
+                              if (parent) {
+                                const errorMsg = document.createElement("p");
+                                errorMsg.className = "text-red-600 text-sm";
+                                errorMsg.textContent =
+                                  "⚠️ Erro ao carregar imagem";
+                                parent.appendChild(errorMsg);
+                                const link = document.createElement("a");
+                                link.href = qaDetails.document_photo_url;
+                                link.target = "_blank";
+                                link.className =
+                                  "text-blue-600 hover:text-blue-800 text-sm block mt-2";
+                                link.textContent = "🔗 Abrir URL diretamente";
+                                parent.appendChild(link);
+                              }
+                            }}
+                          />
+                        </>
+                      )}
+                    </div>
+                  )}
+                  {qaDetails.selfie_photo_url && (
+                    <div>
+                      <span className="text-sm text-gray-600 block mb-2">
+                        Selfie:
+                      </span>
+                      <img
+                        src={qaDetails.selfie_photo_url}
+                        alt="Selfie"
+                        className="max-w-xs h-auto rounded border border-gray-300 cursor-pointer hover:opacity-90"
+                        onClick={() =>
+                          window.open(qaDetails.selfie_photo_url, "_blank")
+                        }
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement;
+                          target.style.display = "none";
+                          const parent = target.parentElement;
+                          if (parent) {
+                            const errorMsg = document.createElement("p");
+                            errorMsg.className = "text-red-600 text-sm";
+                            errorMsg.textContent = "⚠️ Erro ao carregar imagem";
+                            parent.appendChild(errorMsg);
+                            const link = document.createElement("a");
+                            link.href = qaDetails.selfie_photo_url;
+                            link.target = "_blank";
+                            link.className =
+                              "text-blue-600 hover:text-blue-800 text-sm block mt-2";
+                            link.textContent = "🔗 Abrir URL diretamente";
+                            parent.appendChild(link);
+                          }
+                        }}
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* Location & IP */}
+                <div className="space-y-4">
+                  <h3 className="font-semibold text-lg text-gray-900 border-b pb-2">
+                    Localização
+                  </h3>
+                  {qaDetails.geolocation && (
+                    <div>
+                      <span className="text-sm text-gray-600">
+                        Coordenadas:
+                      </span>
+                      <p className="font-medium">
+                        Lat: {qaDetails.geolocation.latitude}, Lng:{" "}
+                        {qaDetails.geolocation.longitude}
+                      </p>
+                    </div>
+                  )}
+                  <div>
+                    <span className="text-sm text-gray-600">
+                      IP de Registro:
+                    </span>
+                    <p className="font-medium">{qaDetails.ip_address || "—"}</p>
+                  </div>
+                </div>
+
+                {/* Education */}
+                {qaDetails.education && qaDetails.education.length > 0 && (
+                  <div className="space-y-4 md:col-span-2">
+                    <h3 className="font-semibold text-lg text-gray-900 border-b pb-2">
+                      Formação Acadêmica
+                    </h3>
+                    {qaDetails.education.map((edu: any, index: number) => (
+                      <div
+                        key={index}
+                        className="bg-gray-50 p-4 rounded border border-gray-200"
+                      >
+                        <p className="font-medium">
+                          {edu.degree_level} - {edu.field_of_study}
+                        </p>
+                        <p className="text-sm text-gray-600">
+                          {edu.institution}
+                        </p>
+                        <p className="text-sm text-gray-600">{edu.years}</p>
+                        {edu.description && (
+                          <p className="text-sm text-gray-700 mt-2">
+                            {edu.description}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Status Info */}
+                <div className="space-y-4 md:col-span-2">
+                  <h3 className="font-semibold text-lg text-gray-900 border-b pb-2">
+                    Status do Cadastro
+                  </h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <span className="text-sm text-gray-600">
+                        Cadastrado em:
+                      </span>
+                      <p className="font-medium">
+                        {new Date(qaDetails.created_at).toLocaleString("pt-BR")}
+                      </p>
+                    </div>
+                    {qaDetails.terms_accepted_at && (
+                      <div>
+                        <span className="text-sm text-gray-600">
+                          Termos aceitos em:
+                        </span>
+                        <p className="font-medium">
+                          {new Date(qaDetails.terms_accepted_at).toLocaleString(
+                            "pt-BR"
+                          )}
+                        </p>
+                      </div>
+                    )}
+                    {qaDetails.approved_at && (
+                      <div>
+                        <span className="text-sm text-gray-600">
+                          Aprovado em:
+                        </span>
+                        <p className="font-medium">
+                          {new Date(qaDetails.approved_at).toLocaleString(
+                            "pt-BR"
+                          )}
+                        </p>
+                      </div>
+                    )}
+                    {qaDetails.rejected_at && (
+                      <div>
+                        <span className="text-sm text-gray-600">
+                          Recusado em:
+                        </span>
+                        <p className="font-medium">
+                          {new Date(qaDetails.rejected_at).toLocaleString(
+                            "pt-BR"
+                          )}
+                        </p>
+                      </div>
+                    )}
+                    {qaDetails.rejection_reason && (
+                      <div className="col-span-2">
+                        <span className="text-sm text-gray-600">
+                          Motivo da recusa:
+                        </span>
+                        <p className="font-medium text-red-600">
+                          {qaDetails.rejection_reason}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-3 mt-6">
+                {qaDetails.status === "pending_approval" && (
+                  <>
+                    <button
+                      onClick={() => {
+                        setShowQADetailsModal(false);
+                        openApproveModal(selectedUser!);
+                      }}
+                      className="px-6 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+                    >
+                      ✅ Aprovar
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowQADetailsModal(false);
+                        openRejectModal(selectedUser!);
+                      }}
+                      className="px-6 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
+                    >
+                      ❌ Recusar
+                    </button>
+                  </>
+                )}
+                <button
+                  onClick={() => setShowQADetailsModal(false)}
+                  className="ml-auto px-6 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200"
+                >
+                  Fechar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Approve QA Modal */}
+        {showApproveModal && selectedUser && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 w-full max-w-md">
+              <h2 className="text-xl font-bold text-green-600 mb-4">
+                ✅ Aprovar QA
+              </h2>
+
+              <p className="text-gray-700 mb-4">
+                Você está prestes a aprovar o cadastro de{" "}
+                <strong>{selectedUser.full_name || selectedUser.email}</strong>{" "}
+                como QA. O usuário receberá um email de confirmação e poderá
+                fazer login na plataforma.
+              </p>
+
+              <div className="flex gap-3 mt-6">
+                <button
+                  onClick={handleApproveQA}
+                  className="flex-1 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+                >
+                  Confirmar Aprovação
+                </button>
+                <button
+                  onClick={() => setShowApproveModal(false)}
+                  className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Reject QA Modal */}
+        {showRejectModal && selectedUser && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 w-full max-w-md">
+              <h2 className="text-xl font-bold text-red-600 mb-4">
+                ❌ Recusar Cadastro QA
+              </h2>
+
+              <p className="text-gray-700 mb-4">
+                Você está prestes a recusar o cadastro de{" "}
+                <strong>{selectedUser.full_name || selectedUser.email}</strong>.
+                O usuário receberá um email informando sobre a recusa.
+              </p>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Motivo da Recusa (opcional, mas recomendado)
+                  </label>
+                  <textarea
+                    value={rejectReason}
+                    onChange={(e) => setRejectReason(e.target.value)}
+                    rows={3}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
+                    placeholder="Ex: Documentação incompleta, requisitos não atendidos, etc."
+                  />
+                </div>
+
+                <div className="flex items-start space-x-3 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+                  <input
+                    type="checkbox"
+                    id="deleteUserCheckbox"
+                    checked={deleteUser}
+                    onChange={(e) => setDeleteUser(e.target.checked)}
+                    className="mt-1 h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded"
+                  />
+                  <div>
+                    <label
+                      htmlFor="deleteUserCheckbox"
+                      className="text-sm font-medium text-gray-900 cursor-pointer"
+                    >
+                      Deletar usuário do sistema
+                    </label>
+                    <p className="text-xs text-gray-600 mt-1">
+                      ⚠️ Se marcado, o usuário será completamente removido do
+                      banco de dados e poderá se cadastrar novamente. Se não
+                      marcado, o cadastro será apenas bloqueado.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-3 mt-6">
+                <button
+                  onClick={handleRejectQA}
+                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
+                >
+                  Confirmar Recusa
+                </button>
+                <button
+                  onClick={() => setShowRejectModal(false)}
+                  className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200"
                 >
                   Cancelar
                 </button>

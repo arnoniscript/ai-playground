@@ -1224,4 +1224,338 @@ router.put('/playgrounds/:id/access-control', adminOnly, async (req: Request, re
   }
 });
 
+/**
+ * PUT /admin/users/:id/approve-qa
+ * Approve a QA registration (change status to active)
+ */
+router.put('/users/:id/approve-qa', adminOnly, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    // Verify user exists and is pending approval
+    const { data: user, error: userError } = await db
+      .from('users')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (userError || !user) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+
+    if (user.role !== 'qa') {
+      res.status(400).json({ error: 'User is not a QA' });
+      return;
+    }
+
+    if (user.status !== 'pending_approval') {
+      res.status(400).json({ error: 'User is not pending approval' });
+      return;
+    }
+
+    // Approve user
+    const { data: approvedUser, error: approveError } = await db
+      .from('users')
+      .update({
+        status: 'active',
+        approved_at: new Date().toISOString(),
+        approved_by: req.user!.id,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (approveError) {
+      console.error('Error approving QA:', approveError);
+      res.status(500).json({ error: 'Failed to approve QA' });
+      return;
+    }
+
+    // Send approval email
+    try {
+      const { sendQAApprovedEmail } = await import('../utils/email.js');
+      await sendQAApprovedEmail({
+        to: approvedUser.email,
+        fullName: approvedUser.full_name || 'User',
+        language: (approvedUser.primary_language as 'pt' | 'en' | 'es') || 'pt'
+      });
+    } catch (emailError) {
+      console.error('Error sending approval email:', emailError);
+      // Don't fail the request if email fails
+    }
+
+    res.json({ 
+      message: 'QA approved successfully',
+      data: approvedUser 
+    });
+  } catch (error) {
+    console.error('Error in PUT /admin/users/:id/approve-qa:', error);
+    res.status(500).json({ error: 'Failed to approve QA' });
+  }
+});
+
+/**
+ * PUT /admin/users/:id/reject-qa
+ * Reject a QA registration with optional reason
+ * Body: { reason?: string, deleteUser?: boolean }
+ */
+router.put('/users/:id/reject-qa', adminOnly, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { reason, deleteUser } = req.body;
+
+    // Verify user exists and is pending approval
+    const { data: user, error: userError } = await db
+      .from('users')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (userError || !user) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+
+    if (user.role !== 'qa') {
+      res.status(400).json({ error: 'User is not a QA' });
+      return;
+    }
+
+    if (user.status !== 'pending_approval') {
+      res.status(400).json({ error: 'User is not pending approval' });
+      return;
+    }
+
+    // If deleteUser is true, delete the user and their files
+    if (deleteUser === true) {
+      // Delete storage files first
+      try {
+        if (user.document_photo_url) {
+          const documentPath = user.document_photo_url.split('/qa-documents/')[1] || user.document_photo_url;
+          await db.storage.from('qa-documents').remove([documentPath]);
+        }
+        if (user.selfie_photo_url) {
+          const selfiePath = user.selfie_photo_url.split('/qa-selfies/')[1] || user.selfie_photo_url;
+          await db.storage.from('qa-selfies').remove([selfiePath]);
+        }
+      } catch (storageError) {
+        console.error('Error deleting storage files:', storageError);
+        // Continue even if storage deletion fails
+      }
+
+      // Delete user from database
+      const { error: deleteError } = await db
+        .from('users')
+        .delete()
+        .eq('id', id);
+
+      if (deleteError) {
+        console.error('Error deleting user:', deleteError);
+        res.status(500).json({ error: 'Failed to delete user' });
+        return;
+      }
+
+      // Send rejection email
+      try {
+        const { sendQARejectedEmail } = await import('../utils/email.js');
+        await sendQARejectedEmail({
+          to: user.email,
+          fullName: user.full_name || 'User',
+          language: (user.primary_language as 'pt' | 'en' | 'es') || 'pt',
+          reason: reason
+        });
+      } catch (emailError) {
+        console.error('Error sending rejection email:', emailError);
+        // Don't fail the request if email fails
+      }
+
+      res.json({ 
+        message: 'QA rejected and deleted successfully',
+        data: { 
+          id: user.id,
+          email: user.email,
+          deleted: true 
+        }
+      });
+      return;
+    }
+
+    // Otherwise, reject user (keep in database but mark as blocked)
+    const { data: rejectedUser, error: rejectError } = await db
+      .from('users')
+      .update({
+        status: 'blocked', // Using blocked status for rejected QAs
+        rejected_at: new Date().toISOString(),
+        rejected_by: req.user!.id,
+        rejection_reason: reason || null,
+        blocked_at: new Date().toISOString(), // Required by users_blocked_check constraint
+        blocked_by: req.user!.id,
+        blocked_reason: `QA registration rejected: ${reason || 'No reason provided'}`,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (rejectError) {
+      console.error('Error rejecting QA:', rejectError);
+      res.status(500).json({ error: 'Failed to reject QA' });
+      return;
+    }
+
+    // Send rejection email
+    try {
+      const { sendQARejectedEmail } = await import('../utils/email.js');
+      await sendQARejectedEmail({
+        to: rejectedUser.email,
+        fullName: rejectedUser.full_name || 'User',
+        language: (rejectedUser.primary_language as 'pt' | 'en' | 'es') || 'pt',
+        reason: reason
+      });
+    } catch (emailError) {
+      console.error('Error sending rejection email:', emailError);
+      // Don't fail the request if email fails
+    }
+
+    res.json({ 
+      message: 'QA rejected successfully',
+      data: rejectedUser 
+    });
+  } catch (error) {
+    console.error('Error in PUT /admin/users/:id/reject-qa:', error);
+    res.status(500).json({ error: 'Failed to reject QA' });
+  }
+});
+
+/**
+ * GET /admin/users/:id/qa-details
+ * Get full QA registration details including photos
+ */
+router.get('/users/:id/qa-details', adminOnly, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    // Fetch user with all QA fields
+    const { data: user, error } = await db
+      .from('users')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (error || !user) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+
+    if (user.role !== 'qa') {
+      res.status(400).json({ error: 'User is not a QA' });
+      return;
+    }
+
+    // Fetch approver/rejector info if exists
+    let approver = null;
+    let rejector = null;
+
+    if (user.approved_by) {
+      const { data: approverData } = await db
+        .from('users')
+        .select('id, email, full_name')
+        .eq('id', user.approved_by)
+        .single();
+      approver = approverData;
+    }
+
+    if (user.rejected_by) {
+      const { data: rejectorData } = await db
+        .from('users')
+        .select('id, email, full_name')
+        .eq('id', user.rejected_by)
+        .single();
+      rejector = rejectorData;
+    }
+
+    res.json({ 
+      data: {
+        ...user,
+        approver,
+        rejector
+      }
+    });
+  } catch (error) {
+    console.error('Error in GET /admin/users/:id/qa-details:', error);
+    res.status(500).json({ error: 'Failed to fetch QA details' });
+  }
+});
+
+/**
+ * DELETE /admin/users/:id
+ * Delete a user (only QAs that are blocked)
+ */
+router.delete('/users/:id', adminOnly, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    // Fetch user
+    const { data: user, error: userError } = await db
+      .from('users')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (userError || !user) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+
+    // Only allow deleting blocked QAs
+    if (user.role !== 'qa' || user.status !== 'blocked') {
+      res.status(400).json({ 
+        error: 'Only blocked QA users can be deleted',
+        details: `User role: ${user.role}, status: ${user.status}` 
+      });
+      return;
+    }
+
+    // Delete storage files first
+    try {
+      if (user.document_photo_url) {
+        const documentPath = user.document_photo_url.split('/qa-documents/')[1] || user.document_photo_url;
+        await db.storage.from('qa-documents').remove([documentPath]);
+      }
+      if (user.selfie_photo_url) {
+        const selfiePath = user.selfie_photo_url.split('/qa-selfies/')[1] || user.selfie_photo_url;
+        await db.storage.from('qa-selfies').remove([selfiePath]);
+      }
+    } catch (storageError) {
+      console.error('Error deleting storage files:', storageError);
+      // Continue even if storage deletion fails
+    }
+
+    // Delete user from database
+    const { error: deleteError } = await db
+      .from('users')
+      .delete()
+      .eq('id', id);
+
+    if (deleteError) {
+      console.error('Error deleting user:', deleteError);
+      res.status(500).json({ error: 'Failed to delete user' });
+      return;
+    }
+
+    res.json({ 
+      message: 'User deleted successfully',
+      data: { 
+        id: user.id,
+        email: user.email
+      }
+    });
+  } catch (error) {
+    console.error('Error in DELETE /admin/users/:id:', error);
+    res.status(500).json({ error: 'Failed to delete user' });
+  }
+});
+
 export default router;

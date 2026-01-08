@@ -1,0 +1,149 @@
+{
+  "common": {
+    "welcome": "Bienvenido",
+    "login": "Iniciar sesión",
+    "logout": "Cerrar sesión",
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "delete": "Eliminar",
+    "edit": "Editar",
+    "create": "Crear",
+    "back": "Volver",
+    "next": "Siguiente",
+    "previous": "Anterior",
+    "submit": "Enviar",
+    "loading": "Cargando...",
+    "error": "Error",
+    "success": "Éxito",
+    "confirm": "Confirmar",
+    "yes": "Sí",
+    "no": "No",
+    "search": "Buscar",
+    "filter": "Filtrar",
+    "close": "Cerrar",
+    "view": "Ver",
+    "download": "Descargar"
+  },
+  "auth": {
+    "email": "Correo electrónico",
+    "password": "Contraseña",
+    "signIn": "Iniciar sesión",
+    "signOut": "Cerrar sesión",
+    "registerAsQA": "Registrarse como QA",
+    "sendCode": "Enviar código",
+    "verifyCode": "Verificar código",
+    "enterOTP": "Ingrese el código enviado a su correo",
+    "invalidOTP": "Código inválido",
+    "accountBlocked": "Cuenta bloqueada"
+  },
+  "qa": {
+    "registration": {
+      "title": "Registro de QA",
+      "subtitle": "Únete a nuestro equipo de Aseguramiento de Calidad",
+      "step1": {
+        "title": "Seleccione su idioma principal",
+        "subtitle": "Elija el idioma que prefiere usar en la plataforma",
+        "portuguese": "Portugués",
+        "english": "Inglés",
+        "spanish": "Español"
+      },
+      "step2": {
+        "title": "Información Personal",
+        "fullName": "Nombre Completo",
+        "email": "Correo electrónico",
+        "birthDate": "Fecha de Nacimiento",
+        "gender": "Género",
+        "selectGender": "Seleccione el género",
+        "male": "Masculino",
+        "female": "Femenino",
+        "other": "Otro",
+        "preferNotToSay": "Prefiero no decir",
+        "nationality": "Nacionalidad",
+        "phone": "Teléfono"
+      },
+      "step3": {
+        "title": "Idiomas Secundarios",
+        "subtitle": "Seleccione otros idiomas que habla (opcional)",
+        "selected": "Seleccionados"
+      },
+      "step4": {
+        "title": "Documento de Identificación",
+        "subtitle": "Suba una foto de su documento oficial con foto",
+        "documentNumber": "Número de Documento",
+        "uploadDocument": "Subir Foto del Documento"
+      },
+      "step5": {
+        "title": "Geolocalización",
+        "subtitle": "Necesitamos capturar su ubicación actual para verificar su región",
+        "capture": "Capturar Ubicación",
+        "captured": "Ubicación capturada exitosamente",
+        "error": "No se pudo capturar la ubicación",
+        "notSupported": "Su navegador no soporta geolocalización"
+      },
+      "step6": {
+        "title": "Selfie de Verificación",
+        "subtitle": "Tome una foto suya usando la cámara de su computadora",
+        "openCamera": "Abrir Cámara",
+        "takeSelfie": "Tomar Selfie",
+        "retake": "Volver a Tomar",
+        "cameraError": "No se pudo acceder a la cámara"
+      },
+      "step7": {
+        "title": "Formación Académica",
+        "subtitle": "Agregue su formación académica (opcional)",
+        "education": "Formación",
+        "addEducation": "Agregar Formación",
+        "remove": "Eliminar",
+        "degreeLevel": "Nivel",
+        "highSchool": "Escuela Secundaria",
+        "associate": "Grado Asociado",
+        "bachelor": "Licenciatura",
+        "master": "Maestría",
+        "doctorate": "Doctorado",
+        "otherDegree": "Otro",
+        "institution": "Institución",
+        "fieldOfStudy": "Campo de Estudio",
+        "years": "Período",
+        "description": "Descripción"
+      },
+      "step8": {
+        "title": "Términos y Condiciones",
+        "termsTitle": "Términos de Uso y Política de Privacidad",
+        "termsContent": "Al registrarse como QA en la plataforma Marisa Care, usted acepta proporcionar información verdadera y precisa, mantener la confidencialidad de los datos accedidos durante las pruebas, seguir las directrices de calidad establecidas y autoriza el uso de los datos proporcionados para fines de verificación de identidad y gestión de acceso. Sus datos personales serán tratados de acuerdo con la LGPD y utilizados solo para fines relacionados con su actividad como QA.",
+        "acceptTerms": "He leído y acepto los términos y condiciones"
+      },
+      "progress": "Progreso",
+      "previous": "Anterior",
+      "next": "Siguiente",
+      "submit": "Enviar Registro",
+      "submitting": "Enviando...",
+      "errors": {
+        "fileTooLarge": "Archivo demasiado grande (máximo 2MB)",
+        "invalidFile": "Archivo inválido"
+      }
+    },
+    "pending": {
+      "title": "Registro en Revisión",
+      "subtitle": "¡Su registro fue recibido exitosamente!",
+      "timeline": {
+        "title": "¿Qué sucede ahora?",
+        "step1": "Registro recibido",
+        "step1Description": "Recibimos toda su información",
+        "step2": "Análisis en curso",
+        "step2Description": "Nuestro equipo está verificando sus datos",
+        "step3": "Resultado por correo",
+        "step3Description": "Recibirá la respuesta dentro de 3 días hábiles"
+      },
+      "email": {
+        "title": "Revise su correo",
+        "description": "Enviamos una confirmación a su correo electrónico"
+      },
+      "time": {
+        "title": "Plazo de revisión",
+        "description": "Hasta 3 días hábiles"
+      },
+      "questions": "¿Preguntas? Contáctenos:",
+      "backToHome": "Volver al inicio"
+    }
+  }
+}

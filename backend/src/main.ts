@@ -8,6 +8,7 @@ import playgroundRoutes from './routes/playgrounds.js';
 import coursesAdminRoutes from './routes/courses-admin.js';
 import coursesRoutes from './routes/courses.js';
 import coursesMetricsRoutes from './routes/courses-metrics.js';
+import notificationsRoutes from './routes/notifications.js';
 
 // Validate environment
 validateConfig();
@@ -15,7 +16,8 @@ validateConfig();
 const app = express();
 
 // Middleware
-app.use(express.json());
+app.use(express.json({ limit: '10mb' })); // Increased limit for base64 image uploads
+app.use(express.urlencoded({ limit: '10mb', extended: true }));
 app.use(cors({
   origin: config.cors.origin,
   credentials: true,
@@ -28,6 +30,7 @@ app.use('/playgrounds', playgroundRoutes);
 app.use('/admin/courses', coursesAdminRoutes);
 app.use('/courses', coursesRoutes);
 app.use('/admin/courses', coursesMetricsRoutes);
+app.use('/notifications', notificationsRoutes);
 
 // Health check
 app.get('/health', (req, res) => {

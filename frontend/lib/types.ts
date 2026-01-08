@@ -1,5 +1,5 @@
-export type UserRole = 'admin' | 'tester' | 'client';
-export type UserStatus = 'active' | 'pending_invite' | 'blocked';
+export type UserRole = 'admin' | 'tester' | 'client' | 'qa' | 'manager';
+export type UserStatus = 'active' | 'pending_invite' | 'blocked' | 'pending_approval';
 export type AccessControlType = 'open' | 'email_restricted' | 'explicit_authorization';
 
 export interface User {
