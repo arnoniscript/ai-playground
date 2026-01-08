@@ -1,6 +1,6 @@
 // Shared types for the application
 
-export type UserRole = 'admin' | 'tester' | 'client';
+export type UserRole = 'admin' | 'manager' | 'tester' | 'client';
 export type UserStatus = 'active' | 'pending_invite' | 'blocked';
 export type PlaygroundType = 'ab_testing' | 'tuning';
 export type QuestionType = 'select' | 'input_string';

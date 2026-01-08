@@ -12,11 +12,11 @@ declare global {
   }
 }
 
-export function authMiddleware(
+export async function authMiddleware(
   req: Request,
   res: Response,
   next: NextFunction
-): void {
+): Promise<void> {
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -32,40 +32,41 @@ export function authMiddleware(
     return;
   }
 
-  // Fetch full user from database to check status
-  db.from('users')
-    .select('*')
-    .eq('id', decoded.sub)
-    .single()
-    .then(({ data: user, error }) => {
-      if (error || !user) {
-        res.status(401).json({ error: 'User not found' });
-        return;
-      }
+  try {
+    // Fetch full user from database to check status
+    const { data: user, error } = await db
+      .from('users')
+      .select('*')
+      .eq('id', decoded.sub)
+      .single();
 
-      // Check if user is blocked
-      if (user.status === 'blocked') {
-        const reasonMessage = user.blocked_reason 
-          ? `Motivo: ${user.blocked_reason}` 
-          : 'Entre em contato com um administrador.';
-        
-        res.status(403).json({ 
-          error: 'Conta bloqueada',
-          message: `Sua conta foi bloqueada. ${reasonMessage}`,
-          blocked_at: user.blocked_at,
-          blocked_reason: user.blocked_reason
-        });
-        return;
-      }
+    if (error || !user) {
+      res.status(401).json({ error: 'User not found' });
+      return;
+    }
 
-      req.token = token;
-      req.user = user;
-      next();
-    })
-    .catch((err) => {
-      console.error('Error fetching user in authMiddleware:', err);
-      res.status(500).json({ error: 'Internal server error' });
-    });
+    // Check if user is blocked
+    if (user.status === 'blocked') {
+      const reasonMessage = user.blocked_reason 
+        ? `Motivo: ${user.blocked_reason}` 
+        : 'Entre em contato com um administrador.';
+      
+      res.status(403).json({ 
+        error: 'Conta bloqueada',
+        message: `Sua conta foi bloqueada. ${reasonMessage}`,
+        blocked_at: user.blocked_at,
+        blocked_reason: user.blocked_reason
+      });
+      return;
+    }
+
+    req.token = token;
+    req.user = user;
+    next();
+  } catch (err) {
+    console.error('Error fetching user in authMiddleware:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 }
 
 export function adminOnly(
