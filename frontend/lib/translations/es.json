@@ -145,5 +145,60 @@
       "questions": "¿Preguntas? Contáctenos:",
       "backToHome": "Volver al inicio"
     }
+  },
+  "admin": {
+    "dashboard": "Panel Administrativo",
+    "users": "Usuarios",
+    "playgrounds": "Playgrounds",
+    "courses": "Cursos",
+    "qaManagement": "Gestión de QAs",
+    "notifications": "Notificaciones",
+    "qa": {
+      "pending": "Pendientes",
+      "approved": "Aprobados",
+      "rejected": "Rechazados",
+      "approve": "Aprobar",
+      "reject": "Rechazar",
+      "ban": "Banear",
+      "sendNotification": "Enviar Notificación",
+      "viewDetails": "Ver Detalles",
+      "personalInfo": "Información Personal",
+      "verification": "Verificación",
+      "education": "Formación Académica",
+      "languages": "Idiomas",
+      "rejectionReason": "Motivo del Rechazo"
+    },
+    "notifications": {
+      "create": "Crear Notificación",
+      "type": "Tipo",
+      "typeBanner": "Banner (Superior)",
+      "typeModal": "Modal (Centro)",
+      "typeEmail": "Correo",
+      "title": "Título",
+      "message": "Mensaje",
+      "image": "Imagen (opcional)",
+      "targetType": "Destinatarios",
+      "targetAll": "Todos los usuarios",
+      "targetRole": "Por función",
+      "targetSpecific": "Usuarios específicos",
+      "expiresAt": "Expira en",
+      "send": "Enviar Notificación"
+    }
+  },
+  "notifications": {
+    "dismiss": "Descartar",
+    "understood": "Entendido"
+  },
+  "errors": {
+    "required": "Campo obligatorio",
+    "invalidEmail": "Correo inválido",
+    "invalidPhone": "Teléfono inválido",
+    "invalidDate": "Fecha inválida",
+    "fileTooLarge": "Archivo demasiado grande",
+    "invalidFileType": "Tipo de archivo inválido",
+    "uploadFailed": "Error en la carga",
+    "locationRequired": "La ubicación es obligatoria",
+    "selfieRequired": "La selfie es obligatoria",
+    "minAge": "Debe tener al menos 18 años"
   }
 }

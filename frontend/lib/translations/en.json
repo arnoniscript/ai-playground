@@ -145,5 +145,60 @@
       "questions": "Questions? Contact us:",
       "backToHome": "Back to home"
     }
+  },
+  "admin": {
+    "dashboard": "Admin Dashboard",
+    "users": "Users",
+    "playgrounds": "Playgrounds",
+    "courses": "Courses",
+    "qaManagement": "QA Management",
+    "notifications": "Notifications",
+    "qa": {
+      "pending": "Pending",
+      "approved": "Approved",
+      "rejected": "Rejected",
+      "approve": "Approve",
+      "reject": "Reject",
+      "ban": "Ban",
+      "sendNotification": "Send Notification",
+      "viewDetails": "View Details",
+      "personalInfo": "Personal Information",
+      "verification": "Verification",
+      "education": "Academic Background",
+      "languages": "Languages",
+      "rejectionReason": "Rejection Reason"
+    },
+    "notifications": {
+      "create": "Create Notification",
+      "type": "Type",
+      "typeBanner": "Banner (Top)",
+      "typeModal": "Modal (Center)",
+      "typeEmail": "Email",
+      "title": "Title",
+      "message": "Message",
+      "image": "Image (optional)",
+      "targetType": "Recipients",
+      "targetAll": "All users",
+      "targetRole": "By role",
+      "targetSpecific": "Specific users",
+      "expiresAt": "Expires at",
+      "send": "Send Notification"
+    }
+  },
+  "notifications": {
+    "dismiss": "Dismiss",
+    "understood": "Understood"
+  },
+  "errors": {
+    "required": "Required field",
+    "invalidEmail": "Invalid email",
+    "invalidPhone": "Invalid phone",
+    "invalidDate": "Invalid date",
+    "fileTooLarge": "File too large",
+    "invalidFileType": "Invalid file type",
+    "uploadFailed": "Upload failed",
+    "locationRequired": "Location is required",
+    "selfieRequired": "Selfie is required",
+    "minAge": "You must be at least 18 years old"
   }
 }
