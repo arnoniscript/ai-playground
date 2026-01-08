@@ -139,7 +139,7 @@ export default function RegisterQAPage() {
           <button
             key={lang.code}
             onClick={() => {
-              setLanguage(lang.code);
+              setLanguage(lang.code as "pt" | "en" | "es");
               setFormData({ ...formData, primary_language: lang.code });
             }}
             className={`p-6 border-2 rounded-lg transition-all ${
