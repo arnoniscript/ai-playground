@@ -87,7 +87,7 @@ export default function PlaygroundEvaluationPage() {
     }
 
     isLoadingRef.current = true;
-    
+
     try {
       const response = await api.get(`/playgrounds/${playgroundId}`);
       const data = response.data.data;
@@ -423,7 +423,7 @@ export default function PlaygroundEvaluationPage() {
               <div className="h-8 bg-gray-200 rounded w-3/4 mb-4"></div>
               <div className="h-4 bg-gray-100 rounded w-full mb-2"></div>
               <div className="h-4 bg-gray-100 rounded w-5/6 mb-6"></div>
-              
+
               <div className="mt-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-lg p-4">
                 <div className="flex items-start gap-3">
                   <div className="text-3xl">🇧🇷</div>
@@ -501,86 +501,86 @@ export default function PlaygroundEvaluationPage() {
 
                 {/* Brazilian Person Tool */}
                 {brazilianPerson && (
-                    <div className="mt-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-lg p-4">
-                      <div className="flex items-start gap-3">
-                        <div className="text-3xl">🇧🇷</div>
-                        <div className="flex-1">
-                          <h3 className="text-lg font-bold text-blue-900 mb-2">
-                            Dados para Teste
-                          </h3>
-                          <p className="text-xs text-blue-700 mb-3 italic">
-                            ⚠️ Atenção: Estes são dados fictícios gerados apenas
-                            para fins de teste. Não representam uma pessoa real.
-                          </p>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-                            <div className="bg-white rounded p-2">
-                              <span className="text-gray-600 font-medium">
-                                Nome:
-                              </span>
-                              <p className="text-gray-900 font-semibold">
-                                {brazilianPerson.nome_completo}
-                              </p>
-                            </div>
-                            <div className="bg-white rounded p-2">
-                              <span className="text-gray-600 font-medium">
-                                CPF:
-                              </span>
-                              <p className="text-gray-900 font-semibold font-mono">
-                                {brazilianPerson.cpf}
-                              </p>
-                            </div>
-                            <div className="bg-white rounded p-2">
-                              <span className="text-gray-600 font-medium">
-                                Data de Nascimento:
-                              </span>
-                              <p className="text-gray-900 font-semibold">
-                                {brazilianPerson.data_nascimento}
-                              </p>
-                            </div>
-                            <div className="bg-white rounded p-2">
-                              <span className="text-gray-600 font-medium">
-                                Sexo:
-                              </span>
-                              <p className="text-gray-900 font-semibold">
-                                {brazilianPerson.sexo}
-                              </p>
-                            </div>
-                            <div className="bg-white rounded p-2 md:col-span-2">
-                              <span className="text-gray-600 font-medium">
-                                Telefone:
-                              </span>
-                              <p className="text-gray-900 font-semibold font-mono">
-                                {brazilianPerson.telefone}
-                              </p>
-                            </div>
+                  <div className="mt-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-lg p-4">
+                    <div className="flex items-start gap-3">
+                      <div className="text-3xl">🇧🇷</div>
+                      <div className="flex-1">
+                        <h3 className="text-lg font-bold text-blue-900 mb-2">
+                          Dados para Teste
+                        </h3>
+                        <p className="text-xs text-blue-700 mb-3 italic">
+                          ⚠️ Atenção: Estes são dados fictícios gerados apenas
+                          para fins de teste. Não representam uma pessoa real.
+                        </p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                          <div className="bg-white rounded p-2">
+                            <span className="text-gray-600 font-medium">
+                              Nome:
+                            </span>
+                            <p className="text-gray-900 font-semibold">
+                              {brazilianPerson.nome_completo}
+                            </p>
+                          </div>
+                          <div className="bg-white rounded p-2">
+                            <span className="text-gray-600 font-medium">
+                              CPF:
+                            </span>
+                            <p className="text-gray-900 font-semibold font-mono">
+                              {brazilianPerson.cpf}
+                            </p>
+                          </div>
+                          <div className="bg-white rounded p-2">
+                            <span className="text-gray-600 font-medium">
+                              Data de Nascimento:
+                            </span>
+                            <p className="text-gray-900 font-semibold">
+                              {brazilianPerson.data_nascimento}
+                            </p>
+                          </div>
+                          <div className="bg-white rounded p-2">
+                            <span className="text-gray-600 font-medium">
+                              Sexo:
+                            </span>
+                            <p className="text-gray-900 font-semibold">
+                              {brazilianPerson.sexo}
+                            </p>
+                          </div>
+                          <div className="bg-white rounded p-2 md:col-span-2">
+                            <span className="text-gray-600 font-medium">
+                              Telefone:
+                            </span>
+                            <p className="text-gray-900 font-semibold font-mono">
+                              {brazilianPerson.telefone}
+                            </p>
                           </div>
                         </div>
                       </div>
                     </div>
-                  )}
+                  </div>
+                )}
 
                 {/* Random Selector Tool */}
                 {randomSelectorResult && (
-                    <div className="mt-4 bg-gradient-to-r from-purple-50 to-pink-50 border-2 border-purple-200 rounded-lg p-4">
-                      <div className="flex items-start gap-3">
-                        <div className="text-3xl">🎲</div>
-                        <div className="flex-1">
-                          <h3 className="text-lg font-bold text-purple-900 mb-2">
-                            {randomSelectorResult.title}
-                          </h3>
-                          <div className="bg-white rounded-lg p-4 border-2 border-purple-300">
-                            <p className="text-xl font-bold text-purple-900 text-center">
-                              {randomSelectorResult.selectedItem}
-                            </p>
-                          </div>
-                          <p className="text-xs text-purple-700 mt-2 italic">
-                            💡 Este item foi selecionado aleatoriamente para
-                            este teste
+                  <div className="mt-4 bg-gradient-to-r from-purple-50 to-pink-50 border-2 border-purple-200 rounded-lg p-4">
+                    <div className="flex items-start gap-3">
+                      <div className="text-3xl">🎲</div>
+                      <div className="flex-1">
+                        <h3 className="text-lg font-bold text-purple-900 mb-2">
+                          {randomSelectorResult.title}
+                        </h3>
+                        <div className="bg-white rounded-lg p-4 border-2 border-purple-300">
+                          <p className="text-xl font-bold text-purple-900 text-center">
+                            {randomSelectorResult.selectedItem}
                           </p>
                         </div>
+                        <p className="text-xs text-purple-700 mt-2 italic">
+                          💡 Este item foi selecionado aleatoriamente para este
+                          teste
+                        </p>
                       </div>
                     </div>
-                  )}
+                  </div>
+                )}
 
                 {/* Payment info */}
                 {playground.is_paid && playground.payment_type && (
