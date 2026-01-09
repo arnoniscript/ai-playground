@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { LanguageProvider } from "@/lib/LanguageContext";
+import BankAccountGuard from "@/components/bank-account-guard";
 
 export const metadata: Metadata = {
   title: "AI Marisa Playground",
@@ -15,7 +16,9 @@ export default function RootLayout({
   return (
     <html lang="pt-BR">
       <body>
-        <LanguageProvider>{children}</LanguageProvider>
+        <LanguageProvider>
+          <BankAccountGuard>{children}</BankAccountGuard>
+        </LanguageProvider>
       </body>
     </html>
   );

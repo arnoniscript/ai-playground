@@ -10,6 +10,7 @@ import coursesRoutes from './routes/courses.js';
 import coursesMetricsRoutes from './routes/courses-metrics.js';
 import notificationsRoutes from './routes/notifications.js';
 import earningsRoutes from './routes/earnings.js';
+import bankAccountsRoutes from './routes/bank-accounts.js';
 
 // Validate environment
 validateConfig();
@@ -33,6 +34,7 @@ app.use('/courses', coursesRoutes);
 app.use('/admin/courses', coursesMetricsRoutes);
 app.use('/notifications', notificationsRoutes);
 app.use('/earnings', earningsRoutes);
+app.use('/bank-accounts', bankAccountsRoutes);
 
 // Health check
 app.get('/health', (req, res) => {

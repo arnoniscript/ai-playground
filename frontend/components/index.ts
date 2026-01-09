@@ -8,3 +8,5 @@ export { CourseDrawer } from './course-drawer';
 export { PlaygroundAccessManager } from './playground-access-manager';
 export { NotificationBanner, NotificationModal } from './notifications';
 export { default as QADashboardEarnings } from './qa-dashboard-earnings';
+export { default as BankAccountModal } from './bank-account-modal';
+export { default as BankAccountGuard } from './bank-account-guard';

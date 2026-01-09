@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Layout } from "@/components/layout";
 import { AdminGuard } from "@/components/auth-guard";
 import api from "@/lib/api";
-import { User, UserRole, UserStatus } from "@/lib/types";
+import { User, UserRole, UserStatus, BankAccount } from "@/lib/types";
 
 export default function UserManagementPage() {
   const router = useRouter();
@@ -22,8 +22,11 @@ export default function UserManagementPage() {
   const [showQADetailsModal, setShowQADetailsModal] = useState(false);
   const [showApproveModal, setShowApproveModal] = useState(false);
   const [showRejectModal, setShowRejectModal] = useState(false);
+  const [showBankRejectModal, setShowBankRejectModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [qaDetails, setQADetails] = useState<any>(null);
+  const [bankAccount, setBankAccount] = useState<BankAccount | null>(null);
+  const [bankRejectReason, setBankRejectReason] = useState("");
 
   // Form states
   const [editForm, setEditForm] = useState({
@@ -187,6 +190,20 @@ export default function UserManagementPage() {
       console.log("Selfie URL:", response.data.data.selfie_photo_url);
       setQADetails(response.data.data);
       setSelectedUser(user);
+
+      // Fetch bank account if user is QA
+      if (user.role === "qa") {
+        try {
+          const bankResponse = await api.get(
+            `/bank-accounts/admin/user/${user.id}`
+          );
+          setBankAccount(bankResponse.data.data);
+        } catch (error) {
+          console.log("No bank account found for user");
+          setBankAccount(null);
+        }
+      }
+
       setShowQADetailsModal(true);
     } catch (error: any) {
       console.error("Failed to fetch QA details:", error);
@@ -226,6 +243,51 @@ export default function UserManagementPage() {
     } catch (error: any) {
       console.error("Failed to reject QA:", error);
       alert(error.response?.data?.error || "Erro ao recusar QA");
+    }
+  };
+
+  const handleApproveBankAccount = async (accountId: string) => {
+    try {
+      await api.put(`/bank-accounts/admin/${accountId}/approve`);
+      alert("Conta bancária aprovada com sucesso!");
+      // Refresh bank account data
+      if (selectedUser) {
+        const bankResponse = await api.get(
+          `/bank-accounts/admin/user/${selectedUser.id}`
+        );
+        setBankAccount(bankResponse.data.data);
+      }
+    } catch (error: any) {
+      console.error("Failed to approve bank account:", error);
+      alert(error.response?.data?.error || "Erro ao aprovar conta bancária");
+    }
+  };
+
+  const handleRejectBankAccount = async () => {
+    if (!bankAccount || !bankRejectReason.trim()) {
+      alert("Por favor, informe o motivo da rejeição");
+      return;
+    }
+
+    try {
+      await api.put(`/bank-accounts/admin/${bankAccount.id}/reject`, {
+        reason: bankRejectReason,
+      });
+      alert(
+        "Conta bancária rejeitada. O usuário precisará atualizar os dados."
+      );
+      setShowBankRejectModal(false);
+      setBankRejectReason("");
+      // Refresh bank account data
+      if (selectedUser) {
+        const bankResponse = await api.get(
+          `/bank-accounts/admin/user/${selectedUser.id}`
+        );
+        setBankAccount(bankResponse.data.data);
+      }
+    } catch (error: any) {
+      console.error("Failed to reject bank account:", error);
+      alert(error.response?.data?.error || "Erro ao rejeitar conta bancária");
     }
   };
 
@@ -1005,6 +1067,142 @@ export default function UserManagementPage() {
                 {/* Status Info */}
                 <div className="space-y-4 md:col-span-2">
                   <h3 className="font-semibold text-lg text-gray-900 border-b pb-2">
+                    💳 Conta Bancária
+                  </h3>
+                  {bankAccount ? (
+                    <div className="bg-gray-50 p-4 rounded border border-gray-200">
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium">
+                            {bankAccount.account_type === "brazilian"
+                              ? "Conta Brasileira"
+                              : "Conta Internacional"}
+                          </span>
+                          {bankAccount.status === "approved" && (
+                            <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">
+                              ✅ Aprovada
+                            </span>
+                          )}
+                          {bankAccount.status === "pending" && (
+                            <span className="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded-full">
+                              ⏳ Pendente
+                            </span>
+                          )}
+                          {bankAccount.status === "rejected" && (
+                            <span className="px-2 py-1 bg-red-100 text-red-800 text-xs rounded-full">
+                              ❌ Rejeitada
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex gap-2">
+                          {bankAccount.status !== "approved" && (
+                            <button
+                              onClick={() =>
+                                handleApproveBankAccount(bankAccount.id)
+                              }
+                              className="px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700"
+                            >
+                              Aprovar
+                            </button>
+                          )}
+                          <button
+                            onClick={() => setShowBankRejectModal(true)}
+                            className="px-3 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700"
+                          >
+                            Rejeitar
+                          </button>
+                        </div>
+                      </div>
+
+                      {bankAccount.account_type === "brazilian" ? (
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <div>
+                            <span className="text-xs text-gray-600">
+                              Agência:
+                            </span>
+                            <p className="font-medium">{bankAccount.agency}</p>
+                          </div>
+                          <div>
+                            <span className="text-xs text-gray-600">
+                              Conta:
+                            </span>
+                            <p className="font-medium">
+                              {bankAccount.account_number}
+                            </p>
+                          </div>
+                          <div>
+                            <span className="text-xs text-gray-600">
+                              Chave PIX:
+                            </span>
+                            <p className="font-medium">{bankAccount.pix_key}</p>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          <div>
+                            <span className="text-xs text-gray-600">IBAN:</span>
+                            <p className="font-medium">{bankAccount.iban}</p>
+                          </div>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <span className="text-xs text-gray-600">
+                                SWIFT:
+                              </span>
+                              <p className="font-medium">
+                                {bankAccount.swift_code}
+                              </p>
+                            </div>
+                            <div>
+                              <span className="text-xs text-gray-600">
+                                Número da Conta:
+                              </span>
+                              <p className="font-medium">
+                                {bankAccount.international_account_number}
+                              </p>
+                            </div>
+                          </div>
+                          <div>
+                            <span className="text-xs text-gray-600">
+                              Banco:
+                            </span>
+                            <p className="font-medium">
+                              {bankAccount.bank_name}
+                            </p>
+                          </div>
+                          <div>
+                            <span className="text-xs text-gray-600">
+                              Endereço do Banco:
+                            </span>
+                            <p className="font-medium">
+                              {bankAccount.bank_address}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
+                      {bankAccount.rejected_reason && (
+                        <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded">
+                          <p className="text-xs font-medium text-red-800">
+                            Motivo da Rejeição:
+                          </p>
+                          <p className="text-sm text-red-600 mt-1">
+                            {bankAccount.rejected_reason}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="bg-yellow-50 p-4 rounded border border-yellow-200">
+                      <p className="text-sm text-yellow-800">
+                        ⚠️ Usuário ainda não cadastrou conta bancária
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Status Info */}
+                <div className="space-y-4 md:col-span-2">
+                  <h3 className="font-semibold text-lg text-gray-900 border-b pb-2">
                     Status do Cadastro
                   </h3>
                   <div className="grid grid-cols-2 gap-4">
@@ -1194,6 +1392,49 @@ export default function UserManagementPage() {
                 </button>
                 <button
                   onClick={() => setShowRejectModal(false)}
+                  className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Reject Bank Account Modal */}
+        {showBankRejectModal && bankAccount && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 w-full max-w-md">
+              <h2 className="text-xl font-bold text-red-600 mb-4">
+                ❌ Rejeitar Conta Bancária
+              </h2>
+
+              <p className="text-gray-700 mb-4">
+                Informe o motivo da rejeição. O usuário receberá esta mensagem e
+                deverá cadastrar uma nova conta bancária com os dados corretos.
+              </p>
+
+              <textarea
+                value={bankRejectReason}
+                onChange={(e) => setBankRejectReason(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-red-500 focus:border-transparent mb-4"
+                rows={4}
+                placeholder="Motivo da rejeição (obrigatório)..."
+              />
+
+              <div className="flex gap-3">
+                <button
+                  onClick={handleRejectBankAccount}
+                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
+                  disabled={!bankRejectReason.trim()}
+                >
+                  Confirmar Rejeição
+                </button>
+                <button
+                  onClick={() => {
+                    setShowBankRejectModal(false);
+                    setBankRejectReason("");
+                  }}
                   className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200"
                 >
                   Cancelar

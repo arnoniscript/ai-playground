@@ -326,7 +326,35 @@ export interface QAEarningSummary {
   rejected_amount: number;
   total_earned: number;
 }
-    total_questions: number;
-    passed: boolean;
-  }>;
+
+// Bank Account types
+
+export type BankAccountType = 'brazilian' | 'international';
+export type BankAccountStatus = 'pending' | 'approved' | 'rejected';
+
+export interface BankAccount {
+  id: string;
+  user_id: string;
+  account_type: BankAccountType;
+  
+  // Brazilian fields
+  agency?: string;
+  account_number?: string;
+  pix_key?: string;
+  
+  // International fields
+  iban?: string;
+  swift_code?: string;
+  international_account_number?: string;
+  bank_name?: string;
+  bank_address?: string;
+  
+  // Status
+  status: BankAccountStatus;
+  rejected_reason?: string;
+  rejected_at?: string;
+  rejected_by?: string;
+  
+  created_at: string;
+  updated_at: string;
 }

@@ -16,7 +16,7 @@ router.get(
 
     let query = supabase
       .from('qa_earnings')
-      .select('*, playgrounds(name)', { count: 'exact' })
+      .select('*, playgrounds(name), users(email, full_name)', { count: 'exact' })
       .eq('user_id', userId)
       .order('submitted_at', { ascending: false })
       .range(Number(offset), Number(offset) + Number(limit) - 1);
@@ -58,7 +58,7 @@ router.get(
     // Get earning and verify ownership
     const { data: earning, error: earningError } = await supabase
       .from('qa_earnings')
-      .select('*, playgrounds(name)')
+      .select('*, playgrounds(name), users(email, full_name)')
       .eq('id', id)
       .eq('user_id', userId)
       .single();
@@ -67,11 +67,26 @@ router.get(
       return res.status(404).json({ error: 'Earning not found' });
     }
 
-    // Get evaluation answers
+    // First, try to get the session_id from the evaluation_id
+    // evaluation_id might be either a session_id or an individual evaluation id
+    let sessionId = earning.evaluation_id;
+    
+    // Try to find an evaluation with this id to get its session_id
+    const { data: evalCheck } = await supabase
+      .from('evaluations')
+      .select('session_id')
+      .eq('id', earning.evaluation_id)
+      .single();
+    
+    if (evalCheck) {
+      sessionId = evalCheck.session_id;
+    }
+
+    // Get evaluation answers using the correct session_id
     const { data: answers, error: answersError } = await supabase
       .from('evaluations')
-      .select('*, questions(question_text, question_type, options)')
-      .eq('id', earning.evaluation_id);
+      .select('id, question_id, answer_text, answer_value, questions(question_text, question_type, options)')
+      .eq('session_id', sessionId);
 
     if (answersError) {
       return res.status(500).json({ error: answersError.message });
@@ -143,7 +158,7 @@ router.get(
     let query = supabase
       .from('qa_earnings')
       .select(
-        '*, users(email, full_name), playgrounds(name)',
+        '*, users(email, full_name, document_number, nationality, phone, birth_date), playgrounds(name)',
         { count: 'exact' }
       )
       .order('submitted_at', { ascending: false })
@@ -183,6 +198,62 @@ router.get(
       page: Math.floor(Number(offset) / Number(limit)) + 1,
       limit: Number(limit),
       pages: totalPages,
+    });
+  })
+);
+
+// Admin: Get evaluation answers for a specific earning
+router.get(
+  '/admin/:id/answers',
+  authenticateToken,
+  asyncHandler(async (req, res) => {
+    if (req.user!.role !== 'admin') {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    const { id } = req.params;
+
+    // Get earning (no ownership check for admin)
+    const { data: earning, error: earningError } = await supabase
+      .from('qa_earnings')
+      .select('*, playgrounds(name), users(email, full_name)')
+      .eq('id', id)
+      .single();
+
+    if (earningError || !earning) {
+      return res.status(404).json({ error: 'Earning not found' });
+    }
+
+    // First, try to get the session_id from the evaluation_id
+    // evaluation_id might be either a session_id or an individual evaluation id
+    let sessionId = earning.evaluation_id;
+    
+    // Try to find an evaluation with this id to get its session_id
+    const { data: evalCheck } = await supabase
+      .from('evaluations')
+      .select('session_id')
+      .eq('id', earning.evaluation_id)
+      .single();
+    
+    if (evalCheck) {
+      sessionId = evalCheck.session_id;
+    }
+
+    // Get evaluation answers using the correct session_id
+    const { data: answers, error: answersError } = await supabase
+      .from('evaluations')
+      .select('id, question_id, answer_text, answer_value, questions(question_text, question_type, options)')
+      .eq('session_id', sessionId);
+
+    if (answersError) {
+      return res.status(500).json({ error: answersError.message });
+    }
+
+    res.json({
+      data: {
+        earning,
+        answers: answers || [],
+      },
     });
   })
 );

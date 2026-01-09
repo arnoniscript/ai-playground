@@ -320,7 +320,7 @@ router.post('/:id/evaluations', async (req: Request, res: Response) => {
           id: uuidv4(),
           user_id: userId,
           playground_id: playgroundId,
-          evaluation_id: evaluationInserts[0].id, // Use first evaluation as reference
+          evaluation_id: payload.session_id, // Use session_id to group all answers
           task_name: playground.name,
           submitted_at: new Date().toISOString(),
           time_spent_seconds: payload.time_spent_seconds || 0,
