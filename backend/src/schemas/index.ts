@@ -20,6 +20,11 @@ export const CreatePlaygroundSchema = z.object({
   evaluation_goal: z.number().int().positive().min(1),
   linked_course_id: z.string().uuid().optional().nullable(),
   course_required: z.boolean().optional().default(false),
+  is_paid: z.boolean().optional().default(false),
+  payment_type: z.enum(['per_hour', 'per_task', 'per_goal']).optional().nullable(),
+  payment_value: z.number().positive().optional().nullable(),
+  max_time_per_task: z.number().int().positive().optional().nullable(),
+  tasks_for_goal: z.number().int().positive().optional().nullable(),
   models: z.array(z.object({
     model_key: z.string(),
     model_name: z.string(),
@@ -47,6 +52,7 @@ export const UpdatePlaygroundSchema = CreatePlaygroundSchema.partial().extend({
 export const SubmitEvaluationSchema = z.object({
   session_id: z.string().uuid(),
   model_key: z.string(),
+  time_spent_seconds: z.number().int().min(0).optional(),
   answers: z.array(z.object({
     question_id: z.string().uuid(),
     answer_text: z.string().optional(),

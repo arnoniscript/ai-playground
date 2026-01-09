@@ -46,7 +46,22 @@ export function Layout({ children }: { children: ReactNode }) {
                     >
                       🔔 Notificações
                     </Link>
+                    <Link
+                      href="/admin/earnings"
+                      className="text-blue-600 hover:text-blue-700"
+                    >
+                      💰 Earnings
+                    </Link>
                   </>
+                )}
+
+                {user?.role === "qa" && (
+                  <Link
+                    href="/rewards-history"
+                    className="text-green-600 hover:text-green-700 font-medium"
+                  >
+                    💎 Histórico de Recompensas
+                  </Link>
                 )}
 
                 <Link

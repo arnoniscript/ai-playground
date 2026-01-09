@@ -7,3 +7,4 @@ export { CourseModal } from './course-modal';
 export { CourseDrawer } from './course-drawer';
 export { PlaygroundAccessManager } from './playground-access-manager';
 export { NotificationBanner, NotificationModal } from './notifications';
+export { default as QADashboardEarnings } from './qa-dashboard-earnings';

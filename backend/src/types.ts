@@ -5,6 +5,8 @@ export type UserStatus = 'active' | 'pending_invite' | 'blocked' | 'pending_appr
 export type PlaygroundType = 'ab_testing' | 'tuning';
 export type QuestionType = 'select' | 'input_string';
 export type AccessControlType = 'open' | 'email_restricted' | 'explicit_authorization';
+export type PaymentType = 'per_hour' | 'per_task' | 'per_goal';
+export type EarningStatus = 'under_review' | 'ready_for_payment' | 'paid' | 'rejected';
 
 export interface User {
   id: string;
@@ -35,6 +37,11 @@ export interface Playground {
   evaluation_goal: number;
   linked_course_id: string | null;
   course_required: boolean;
+  is_paid: boolean;
+  payment_type: PaymentType | null;
+  payment_value: number | null;
+  max_time_per_task: number | null;
+  tasks_for_goal: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -112,6 +119,21 @@ export interface PaginatedResponse<T> {
   page: number;
   limit: number;
   pages: number;
+}
+
+export interface QAEarning {
+  id: string;
+  user_id: string;
+  playground_id: string;
+  evaluation_id: string;
+  task_name: string;
+  submitted_at: string;
+  time_spent_seconds: number;
+  amount: number;
+  status: EarningStatus;
+  paid_at: string | null;
+  rejected_reason: string | null;
+  created_at: string;
 }
 
 // Course System Types

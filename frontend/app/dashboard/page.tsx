@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import api from "@/lib/api";
 import { Playground } from "@/lib/types";
 import Link from "next/link";
+import QADashboardEarnings from "@/components/qa-dashboard-earnings";
 
 export default function TesterDashboard() {
   const { user } = useAuthStore();
@@ -40,6 +41,9 @@ export default function TesterDashboard() {
               Escolha um playground para começar a avaliar
             </p>
           </div>
+
+          {/* QA Earnings Dashboard - Only for QAs */}
+          {user?.role === "qa" && <QADashboardEarnings />}
 
           {loading ? (
             <div className="text-center py-12">Carregando playgrounds...</div>
@@ -85,16 +89,50 @@ export default function TesterDashboard() {
                     <div className="p-6 bg-white rounded-lg shadow transition flex flex-col hover:shadow-lg cursor-pointer h-full">
                       <div className="flex items-start justify-between mb-2">
                         <h2 className="text-xl font-bold">{playground.name}</h2>
-                        {isPrivate && (
-                          <span className="flex items-center gap-1 px-2 py-1 bg-amber-100 text-amber-800 text-xs font-medium rounded-full ml-2">
-                            🔒 Privado
-                          </span>
-                        )}
+                        <div className="flex gap-2">
+                          {isPrivate && (
+                            <span className="flex items-center gap-1 px-2 py-1 bg-amber-100 text-amber-800 text-xs font-medium rounded-full">
+                              🔒 Privado
+                            </span>
+                          )}
+                          {playground.is_paid && (
+                            <span className="flex items-center gap-1 px-2 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full">
+                              💰 Remunerado
+                            </span>
+                          )}
+                        </div>
                       </div>
                       {playground.description && (
                         <p className="text-gray-600 mb-4">
                           {playground.description}
                         </p>
+                      )}
+
+                      {playground.is_paid && playground.payment_type && (
+                        <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4">
+                          <div className="flex items-center gap-2 text-sm">
+                            <span className="font-semibold text-green-900">
+                              {playground.payment_type === "per_hour" &&
+                                `R$ ${playground.payment_value?.toFixed(
+                                  2
+                                )}/hora`}
+                              {playground.payment_type === "per_task" &&
+                                `R$ ${playground.payment_value?.toFixed(
+                                  2
+                                )}/task`}
+                              {playground.payment_type === "per_goal" &&
+                                `R$ ${playground.payment_value?.toFixed(
+                                  2
+                                )} a cada ${playground.tasks_for_goal} tasks`}
+                            </span>
+                          </div>
+                          {playground.payment_type === "per_hour" &&
+                            playground.max_time_per_task && (
+                              <p className="text-xs text-green-700 mt-1">
+                                Máx. {playground.max_time_per_task} min/task
+                              </p>
+                            )}
+                        </div>
                       )}
 
                       <div className="mt-auto space-y-3">

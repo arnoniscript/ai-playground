@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { AuthGuard } from "@/components/auth-guard";
 import { Layout } from "@/components/layout";
 import { ModelEmbed } from "@/components/model-embed";
 import { EvaluationForm } from "@/components/evaluation-form";
 import { CourseDrawer } from "@/components/course-drawer";
+import TimeTracker from "@/components/time-tracker";
 import api from "@/lib/api";
 import { Playground, ModelConfiguration, Question } from "@/lib/types";
 import { v4 as uuidv4 } from "uuid";
@@ -26,6 +27,7 @@ export default function PlaygroundEvaluationPage() {
   const [contentAlignment, setContentAlignment] = useState<
     "left" | "center" | "right"
   >("center");
+  const timeSpentRef = useRef<number>(0);
 
   useEffect(() => {
     fetchPlaygroundData();
@@ -78,9 +80,18 @@ export default function PlaygroundEvaluationPage() {
 
   const handleSubmitEvaluation = async (answers: any[]) => {
     try {
+      const timeSpent = playground?.is_paid ? timeSpentRef.current : undefined;
+
+      console.log("Submitting evaluation:", {
+        is_paid: playground?.is_paid,
+        time_spent_seconds: timeSpent,
+        playground_id: playgroundId,
+      });
+
       await api.post(`/playgrounds/${playgroundId}/evaluations`, {
         model_key: selectedModel,
         session_id: sessionId,
+        time_spent_seconds: timeSpent,
         answers: answers.map((answer) => ({
           question_id: answer.question_id,
           answer_text: answer.answer_text,
@@ -94,6 +105,8 @@ export default function PlaygroundEvaluationPage() {
         const nextModel = await getNextModel();
         setSelectedModel(nextModel);
         setCurrentStep(1);
+        // Reset timer for second evaluation
+        timeSpentRef.current = 0;
       } else {
         // Done - redirect to thank you or dashboard
         router.push("/dashboard?evaluated=true");
@@ -158,6 +171,16 @@ export default function PlaygroundEvaluationPage() {
   return (
     <AuthGuard>
       <Layout>
+        {/* Time Tracker */}
+        {playground?.is_paid && (
+          <TimeTracker
+            isPaid={true}
+            onTimeUpdate={(seconds) => {
+              timeSpentRef.current = seconds;
+            }}
+          />
+        )}
+
         {/* Alignment Controls */}
         <div className="fixed top-20 right-4 z-30 bg-white shadow-lg rounded-lg p-2 flex gap-1">
           <button
@@ -241,6 +264,52 @@ export default function PlaygroundEvaluationPage() {
             </h1>
             {playground.description && (
               <p className="text-gray-600 mb-4">{playground.description}</p>
+            )}
+
+            {/* Payment info */}
+            {playground.is_paid && playground.payment_type && (
+              <div className="mt-4 bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200 rounded-lg p-4">
+                <div className="flex items-start gap-3">
+                  <div className="text-3xl">💰</div>
+                  <div className="flex-1">
+                    <h3 className="text-lg font-bold text-green-900 mb-2">
+                      Playground Remunerado
+                    </h3>
+                    <div className="space-y-2">
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-2xl font-bold text-green-600">
+                          R$ {playground.payment_value?.toFixed(2)}
+                        </span>
+                        <span className="text-sm text-green-700">
+                          {playground.payment_type === "per_hour" &&
+                            "por hora trabalhada"}
+                          {playground.payment_type === "per_task" &&
+                            "por task completada"}
+                          {playground.payment_type === "per_goal" &&
+                            `ao completar ${playground.tasks_for_goal} tasks`}
+                        </span>
+                      </div>
+                      {playground.payment_type === "per_hour" &&
+                        playground.max_time_per_task && (
+                          <p className="text-sm text-green-800">
+                            ⏱️ Tempo máximo pago:{" "}
+                            <span className="font-semibold">
+                              {playground.max_time_per_task} minutos por task
+                            </span>
+                          </p>
+                        )}
+                      <div className="bg-white bg-opacity-60 rounded p-2 mt-2">
+                        <p className="text-xs text-green-800">
+                          <strong>ℹ️ Como funciona:</strong> O tempo é contado
+                          apenas quando esta aba está ativa. Se você mudar de
+                          aba ou minimizar o navegador, o timer pausa
+                          automaticamente.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             )}
 
             {/* Course info badge */}

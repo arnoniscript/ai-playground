@@ -62,6 +62,15 @@ function CreatePlaygroundForm() {
   // Authorized clients (independent of private/public)
   const [authorizedClientIds, setAuthorizedClientIds] = useState<string[]>([]);
 
+  // Payment settings
+  const [isPaid, setIsPaid] = useState<boolean>(false);
+  const [paymentType, setPaymentType] = useState<
+    "per_hour" | "per_task" | "per_goal"
+  >("per_task");
+  const [paymentValue, setPaymentValue] = useState<number>(0);
+  const [maxTimePerTask, setMaxTimePerTask] = useState<number>(0);
+  const [tasksForGoal, setTasksForGoal] = useState<number>(0);
+
   // Models
   const [models, setModels] = useState<ModelInput[]>([
     { key: "", embedCode: "" },
@@ -281,6 +290,27 @@ function CreatePlaygroundForm() {
       return;
     }
 
+    // Validate payment settings
+    if (isPaid) {
+      if (!paymentValue || paymentValue <= 0) {
+        setError("Valor de pagamento deve ser maior que zero");
+        return;
+      }
+      if (
+        paymentType === "per_hour" &&
+        (!maxTimePerTask || maxTimePerTask <= 0)
+      ) {
+        setError("Tempo máximo por task é obrigatório para pagamento por hora");
+        return;
+      }
+      if (paymentType === "per_goal" && (!tasksForGoal || tasksForGoal <= 0)) {
+        setError(
+          "Número de tasks para meta é obrigatório para pagamento por meta"
+        );
+        return;
+      }
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -294,6 +324,13 @@ function CreatePlaygroundForm() {
         linked_course_id: linkedCourseId || null,
         course_required: courseRequired,
         restricted_emails: isPrivate ? selectedEmails : null,
+        is_paid: isPaid,
+        payment_type: isPaid ? paymentType : null,
+        payment_value: isPaid ? paymentValue : null,
+        max_time_per_task:
+          isPaid && paymentType === "per_hour" ? maxTimePerTask : null,
+        tasks_for_goal:
+          isPaid && paymentType === "per_goal" ? tasksForGoal : null,
         models: models.map((m) => ({
           model_key: m.key,
           model_name: m.key, // Using key as name for now
@@ -495,6 +532,166 @@ function CreatePlaygroundForm() {
                       </p>
                     </div>
                   </div>
+                )}
+              </div>
+            </section>
+
+            {/* Payment Configuration Section */}
+            <section className="bg-white border rounded-lg p-6">
+              <h2 className="text-xl font-semibold mb-4">
+                Configuração de Remuneração
+              </h2>
+              <p className="text-sm text-gray-600 mb-4">
+                Configure se este playground remunera os QAs por suas
+                avaliações.
+              </p>
+
+              <div className="space-y-4">
+                <div className="flex items-start space-x-2">
+                  <input
+                    type="checkbox"
+                    id="isPaid"
+                    checked={isPaid}
+                    onChange={(e) => setIsPaid(e.target.checked)}
+                    className="mt-1"
+                  />
+                  <div>
+                    <label
+                      htmlFor="isPaid"
+                      className="text-sm font-medium cursor-pointer"
+                    >
+                      Este playground é remunerado
+                    </label>
+                    <p className="text-xs text-gray-600 mt-1">
+                      QAs receberão pagamento por completar avaliações neste
+                      playground
+                    </p>
+                  </div>
+                </div>
+
+                {isPaid && (
+                  <>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">
+                        Tipo de Pagamento *
+                      </label>
+                      <select
+                        value={paymentType}
+                        onChange={(e) =>
+                          setPaymentType(
+                            e.target.value as
+                              | "per_hour"
+                              | "per_task"
+                              | "per_goal"
+                          )
+                        }
+                        className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="per_hour">Por Hora (R$/hora)</option>
+                        <option value="per_task">Por Task (R$/task)</option>
+                        <option value="per_goal">
+                          Por Meta (R$ ao atingir X tasks)
+                        </option>
+                      </select>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {paymentType === "per_hour" &&
+                          "QA recebe baseado no tempo ativo gasto na task"}
+                        {paymentType === "per_task" &&
+                          "QA recebe valor fixo por cada task completada"}
+                        {paymentType === "per_goal" &&
+                          "QA recebe ao completar um número específico de tasks"}
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium mb-1">
+                        Valor (R$) *
+                      </label>
+                      <input
+                        type="number"
+                        value={paymentValue}
+                        onChange={(e) =>
+                          setPaymentValue(parseFloat(e.target.value) || 0)
+                        }
+                        className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        min="0"
+                        step="0.01"
+                        required
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        {paymentType === "per_hour" &&
+                          "Valor por hora de trabalho"}
+                        {paymentType === "per_task" &&
+                          "Valor por cada task completada"}
+                        {paymentType === "per_goal" &&
+                          "Valor total ao atingir a meta"}
+                      </p>
+                    </div>
+
+                    {paymentType === "per_hour" && (
+                      <div>
+                        <label className="block text-sm font-medium mb-1">
+                          Tempo Máximo por Task (minutos) *
+                        </label>
+                        <input
+                          type="number"
+                          value={maxTimePerTask}
+                          onChange={(e) =>
+                            setMaxTimePerTask(parseInt(e.target.value) || 0)
+                          }
+                          className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          min="1"
+                          required
+                        />
+                        <p className="text-xs text-gray-500 mt-1">
+                          Limite máximo de tempo pago por task (evita pagamento
+                          excessivo)
+                        </p>
+                      </div>
+                    )}
+
+                    {paymentType === "per_goal" && (
+                      <div>
+                        <label className="block text-sm font-medium mb-1">
+                          Número de Tasks para Meta *
+                        </label>
+                        <input
+                          type="number"
+                          value={tasksForGoal}
+                          onChange={(e) =>
+                            setTasksForGoal(parseInt(e.target.value) || 0)
+                          }
+                          className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          min="1"
+                          required
+                        />
+                        <p className="text-xs text-gray-500 mt-1">
+                          QA receberá o pagamento ao completar este número de
+                          tasks
+                        </p>
+                      </div>
+                    )}
+
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                      <h4 className="text-sm font-medium text-blue-900 mb-2">
+                        💡 Informações sobre Rastreamento de Tempo
+                      </h4>
+                      <ul className="text-xs text-blue-800 space-y-1">
+                        <li>
+                          • O tempo é contado apenas quando a aba do playground
+                          está ativa
+                        </li>
+                        <li>
+                          • Se o QA mudar de aba ou minimizar o navegador, o
+                          timer pausa automaticamente
+                        </li>
+                        <li>
+                          • Isso garante que apenas o tempo efetivamente
+                          trabalhado seja contabilizado
+                        </li>
+                      </ul>
+                    </div>
+                  </>
                 )}
               </div>
             </section>

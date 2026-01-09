@@ -146,6 +146,11 @@ router.post('/playgrounds', adminOnly, async (req: Request, res: Response) => {
         evaluation_goal: payload.evaluation_goal,
         linked_course_id: payload.linked_course_id || null,
         course_required: payload.course_required || false,
+        is_paid: payload.is_paid || false,
+        payment_type: payload.payment_type || null,
+        payment_value: payload.payment_value || null,
+        max_time_per_task: payload.max_time_per_task || null,
+        tasks_for_goal: payload.tasks_for_goal || null,
       })
       .select()
       .single();
@@ -249,6 +254,11 @@ router.put('/playgrounds/:id', adminOnly, async (req: Request, res: Response) =>
     if (payload.evaluation_goal !== undefined) updateData.evaluation_goal = payload.evaluation_goal;
     if (payload.linked_course_id !== undefined) updateData.linked_course_id = payload.linked_course_id;
     if (payload.course_required !== undefined) updateData.course_required = payload.course_required;
+    if (payload.is_paid !== undefined) updateData.is_paid = payload.is_paid;
+    if (payload.payment_type !== undefined) updateData.payment_type = payload.payment_type;
+    if (payload.payment_value !== undefined) updateData.payment_value = payload.payment_value;
+    if (payload.max_time_per_task !== undefined) updateData.max_time_per_task = payload.max_time_per_task;
+    if (payload.tasks_for_goal !== undefined) updateData.tasks_for_goal = payload.tasks_for_goal;
 
     console.log('PUT /admin/playgrounds/:id - Update data:', updateData);
 

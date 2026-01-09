@@ -4,6 +4,7 @@ import { authMiddleware } from '../middleware/auth.js';
 import { SubmitEvaluationSchema } from '../schemas/index.js';
 import { v4 as uuidv4 } from 'uuid';
 import { getUserAccessiblePlaygrounds, userHasPlaygroundAccess } from '../utils/playground-access.js';
+import { calculateEarning } from './earnings.js';
 
 const router = Router();
 
@@ -266,6 +267,67 @@ router.post('/:id/evaluations', async (req: Request, res: Response) => {
       console.error('Error updating counter:', updateError);
       res.status(500).json({ error: 'Failed to update counter' });
       return;
+    }
+
+    // If playground is paid and user is QA, calculate and save earning
+    if (playground.is_paid && userRole === 'qa' && payload.time_spent_seconds !== undefined) {
+      try {
+        console.log('Processing earning for QA:', { userId, playgroundId, timeSpent: payload.time_spent_seconds });
+        
+        // Get user's completed tasks count for per_goal calculation
+        const { count: completedTasks } = await db
+          .from('qa_earnings')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', userId)
+          .eq('playground_id', playgroundId);
+
+        const amount = calculateEarning(
+          playground.payment_type,
+          playground.payment_value,
+          payload.time_spent_seconds,
+          playground.max_time_per_task,
+          playground.tasks_for_goal,
+          completedTasks || 0
+        );
+
+        console.log('Calculated earning amount:', amount);
+
+        // Create earning even if amount is 0 (for tracking purposes)
+        // Admin can later adjust or approve based on actual work
+        const earningData = {
+          id: uuidv4(),
+          user_id: userId,
+          playground_id: playgroundId,
+          evaluation_id: evaluationInserts[0].id, // Use first evaluation as reference
+          task_name: playground.name,
+          submitted_at: new Date().toISOString(),
+          time_spent_seconds: payload.time_spent_seconds || 0,
+          amount: Math.max(0, amount), // Ensure non-negative
+          status: 'under_review',
+        };
+
+        console.log('Inserting earning:', earningData);
+
+        const { error: earningError } = await db
+          .from('qa_earnings')
+          .insert(earningData);
+
+        if (earningError) {
+          console.error('Error creating earning:', earningError);
+          // Don't fail the whole request if earning fails
+        } else {
+          console.log('✅ Earning created successfully');
+        }
+      } catch (earningCalcError) {
+        console.error('Error calculating earning:', earningCalcError);
+        // Don't fail the whole request if earning calculation fails
+      }
+    } else {
+      console.log('Earning not created:', { 
+        is_paid: playground.is_paid, 
+        userRole, 
+        time_spent_seconds: payload.time_spent_seconds 
+      });
     }
 
     res.status(201).json({
