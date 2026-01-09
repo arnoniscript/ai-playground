@@ -283,6 +283,8 @@ export interface UserCourseMetrics {
     step_title: string;
     attempts: number;
     best_score: number;
+    total_questions: number;
+    passed: boolean;
   }>;
 }
 

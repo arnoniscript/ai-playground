@@ -1,8 +1,8 @@
 import { Router } from 'express';
-import { supabase } from '../db/client';
-import { asyncHandler } from '../utils/asyncHandler';
-import { authenticateToken } from '../middleware/auth';
-import { PaymentType, EarningStatus } from '../types';
+import { supabase } from '../db/client.js';
+import { asyncHandler } from '../utils/asyncHandler.js';
+import { authenticateToken } from '../middleware/auth.js';
+import { PaymentType, EarningStatus } from '../types.js';
 
 const router = Router();
 

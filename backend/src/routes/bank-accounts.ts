@@ -1,7 +1,7 @@
 import { Router } from 'express';
-import { supabase } from '../db/client';
-import { asyncHandler } from '../utils/asyncHandler';
-import { authenticateToken } from '../middleware/auth';
+import { supabase } from '../db/client.js';
+import { asyncHandler } from '../utils/asyncHandler.js';
+import { authenticateToken } from '../middleware/auth.js';
 import { z } from 'zod';
 
 const router = Router();

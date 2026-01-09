@@ -36,9 +36,24 @@ app.use('/notifications', notificationsRoutes);
 app.use('/earnings', earningsRoutes);
 app.use('/bank-accounts', bankAccountsRoutes);
 
+// Root endpoint
+app.get('/', (req, res) => {
+  res.json({ 
+    message: 'AI Marisa Playground API',
+    version: '1.0.0',
+    status: 'running'
+  });
+});
+
 // Health check
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  res.status(200).json({ 
+    status: 'ok', 
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    environment: config.server.nodeEnv,
+    port: config.server.port
+  });
 });
 
 // Error handling

@@ -3,8 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { coursesMetricsApi, coursesAdminApi } from "@/lib/api";
-import type { UserCourseMetrics, CourseStep } from "@/lib/types";
 import { Layout } from "@/components/layout";
+import type { UserCourseMetrics, CourseStep } from "@/lib/types";
 
 export default function UserCourseDetailsPage({
   params,
