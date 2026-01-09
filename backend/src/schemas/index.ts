@@ -25,6 +25,11 @@ export const CreatePlaygroundSchema = z.object({
   payment_value: z.number().positive().optional().nullable(),
   max_time_per_task: z.number().int().positive().optional().nullable(),
   tasks_for_goal: z.number().int().positive().optional().nullable(),
+  tools: z.array(z.object({
+    type: z.string(),
+    enabled: z.boolean(),
+    config: z.any().optional(),
+  })).optional().default([]),
   models: z.array(z.object({
     model_key: z.string(),
     model_name: z.string(),

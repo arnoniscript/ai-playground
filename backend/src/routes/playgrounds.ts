@@ -5,10 +5,25 @@ import { SubmitEvaluationSchema } from '../schemas/index.js';
 import { v4 as uuidv4 } from 'uuid';
 import { getUserAccessiblePlaygrounds, userHasPlaygroundAccess } from '../utils/playground-access.js';
 import { calculateEarning } from './earnings.js';
+import { generateBrazilianPerson } from '../utils/brazilian-person-generator.js';
 
 const router = Router();
 
 router.use(authMiddleware);
+
+/**
+ * GET /playgrounds/generate-brazilian-person
+ * Generate random Brazilian person data for testing
+ */
+router.get('/generate-brazilian-person', async (req: Request, res: Response) => {
+  try {
+    const person = generateBrazilianPerson();
+    res.json({ data: person });
+  } catch (error) {
+    console.error('Error generating Brazilian person:', error);
+    res.status(500).json({ error: 'Failed to generate person data' });
+  }
+});
 
 /**
  * GET /playgrounds
@@ -151,6 +166,13 @@ router.get('/:id', async (req: Request, res: Response) => {
       .from('evaluation_counters')
       .select('*')
       .eq('playground_id', id);
+
+    console.log('Playground data with tools:', {
+      id: playground.id,
+      name: playground.name,
+      tools: playground.tools,
+      hasTools: !!playground.tools,
+    });
 
     res.json({
       data: {

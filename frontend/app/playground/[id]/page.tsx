@@ -9,7 +9,12 @@ import { EvaluationForm } from "@/components/evaluation-form";
 import { CourseDrawer } from "@/components/course-drawer";
 import TimeTracker from "@/components/time-tracker";
 import api from "@/lib/api";
-import { Playground, ModelConfiguration, Question } from "@/lib/types";
+import {
+  Playground,
+  ModelConfiguration,
+  Question,
+  BrazilianPerson,
+} from "@/lib/types";
 import { v4 as uuidv4 } from "uuid";
 
 export default function PlaygroundEvaluationPage() {
@@ -28,12 +33,61 @@ export default function PlaygroundEvaluationPage() {
     "left" | "center" | "right"
   >("center");
   const timeSpentRef = useRef<number>(0);
+  const currentPlaygroundIdRef = useRef<string>(playgroundId);
+  const isLoadingRef = useRef<boolean>(false);
+  const [brazilianPerson, setBrazilianPerson] =
+    useState<BrazilianPerson | null>(null);
+  const [randomSelectorResult, setRandomSelectorResult] = useState<{
+    title: string;
+    selectedItem: string;
+  } | null>(null);
+  const [loadingBrazilianPerson, setLoadingBrazilianPerson] = useState(false);
+  const [loadingRandomSelector, setLoadingRandomSelector] = useState(false);
+  const [minTimeElapsed, setMinTimeElapsed] = useState(false);
+  const [showContent, setShowContent] = useState(false);
+  const [dataReady, setDataReady] = useState(false);
+
+  // Immediately hide content when playground ID changes
+  if (currentPlaygroundIdRef.current !== playgroundId) {
+    currentPlaygroundIdRef.current = playgroundId;
+    setShowContent(false);
+    setDataReady(false);
+    setBrazilianPerson(null);
+    setRandomSelectorResult(null);
+  }
+
+  // Clear tool data when playground changes and reset minimum time
+  useEffect(() => {
+    setShowContent(false);
+    setDataReady(false);
+    setBrazilianPerson(null);
+    setRandomSelectorResult(null);
+    setLoadingBrazilianPerson(false);
+    setLoadingRandomSelector(false);
+    setMinTimeElapsed(false);
+    isLoadingRef.current = false;
+
+    // Set minimum display time of 1 second
+    const timer = setTimeout(() => {
+      setMinTimeElapsed(true);
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [playgroundId]);
 
   useEffect(() => {
     fetchPlaygroundData();
   }, [playgroundId]);
 
   const fetchPlaygroundData = async () => {
+    // Prevent duplicate calls
+    if (isLoadingRef.current) {
+      console.log("Already loading, skipping...");
+      return;
+    }
+
+    isLoadingRef.current = true;
+    
     try {
       const response = await api.get(`/playgrounds/${playgroundId}`);
       const data = response.data.data;
@@ -49,6 +103,72 @@ export default function PlaygroundEvaluationPage() {
       setModels(data.models || []);
       setQuestions(data.questions || []);
 
+      console.log("Playground data received:", {
+        id: data.id,
+        name: data.name,
+        tools: data.tools,
+        toolsType: typeof data.tools,
+        toolsIsArray: Array.isArray(data.tools),
+      });
+
+      // Ensure tools is an array
+      const tools = Array.isArray(data.tools) ? data.tools : [];
+
+      // Clear previous data and set loading states first
+      const hasBrazilianPersonTool = tools.some(
+        (tool: any) => tool.type === "generate_brazilian_person" && tool.enabled
+      );
+
+      const randomSelectorTool = tools.find(
+        (tool: any) => tool.type === "random_selector" && tool.enabled
+      );
+
+      // Reset states before fetching new data
+      if (hasBrazilianPersonTool) {
+        setBrazilianPerson(null);
+        setLoadingBrazilianPerson(true);
+      }
+
+      if (randomSelectorTool && randomSelectorTool.config?.items?.length > 0) {
+        setRandomSelectorResult(null);
+        setLoadingRandomSelector(true);
+      }
+
+      // Check if Brazilian person generator tool is enabled
+      if (hasBrazilianPersonTool) {
+        console.log("Brazilian person tool enabled, generating data...");
+        try {
+          // Generate Brazilian person data
+          const personResponse = await api.get(
+            "/playgrounds/generate-brazilian-person"
+          );
+          setBrazilianPerson(personResponse.data.data);
+        } catch (error) {
+          console.error("Error generating Brazilian person:", error);
+        } finally {
+          setLoadingBrazilianPerson(false);
+        }
+      }
+
+      // Check if random selector tool is enabled
+      if (randomSelectorTool && randomSelectorTool.config?.items?.length > 0) {
+        console.log("Random selector tool enabled:", randomSelectorTool);
+        try {
+          // Randomly select an item from the list
+          const items = randomSelectorTool.config.items;
+          const randomItem = items[Math.floor(Math.random() * items.length)];
+          console.log("Selected random item:", randomItem);
+          setRandomSelectorResult({
+            title: randomSelectorTool.config.title,
+            selectedItem: randomItem,
+          });
+        } catch (error) {
+          console.error("Error selecting random item:", error);
+        } finally {
+          setLoadingRandomSelector(false);
+        }
+      }
+
       // For A/B testing, randomly select first model
       if (
         data.type === "ab_testing" &&
@@ -62,11 +182,50 @@ export default function PlaygroundEvaluationPage() {
       }
 
       setLoading(false);
+      setDataReady(true);
+      isLoadingRef.current = false;
     } catch (error) {
       console.error("Failed to fetch playground:", error);
       setLoading(false);
+      setDataReady(true);
+      isLoadingRef.current = false;
     }
   };
+
+  // Show content only when minTimeElapsed is true and all data is ready
+  useEffect(() => {
+    if (!loading && playground && minTimeElapsed && dataReady) {
+      // Check if tools are enabled
+      const tools = Array.isArray(playground.tools) ? playground.tools : [];
+      const hasBrazilianPerson = tools.some(
+        (t: any) => t.type === "generate_brazilian_person" && t.enabled
+      );
+      const hasRandomSelector = tools.some(
+        (t: any) => t.type === "random_selector" && t.enabled
+      );
+
+      // Only show content when all enabled tools have loaded
+      const brazilianPersonReady =
+        !hasBrazilianPerson ||
+        (!loadingBrazilianPerson && brazilianPerson !== null);
+      const randomSelectorReady =
+        !hasRandomSelector ||
+        (!loadingRandomSelector && randomSelectorResult !== null);
+
+      if (brazilianPersonReady && randomSelectorReady) {
+        setShowContent(true);
+      }
+    }
+  }, [
+    loading,
+    playground,
+    minTimeElapsed,
+    dataReady,
+    loadingBrazilianPerson,
+    loadingRandomSelector,
+    brazilianPerson,
+    randomSelectorResult,
+  ]);
 
   const getNextModel = async (): Promise<string> => {
     try {
@@ -255,119 +414,281 @@ export default function PlaygroundEvaluationPage() {
         </div>
 
         <div
+          key={`playground-${playgroundId}-${showContent}`}
           className={`max-w-4xl space-y-8 transition-all duration-300 ${getAlignmentClass()}`}
         >
-          {/* Header */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">
-              {playground.name}
-            </h1>
-            {playground.description && (
-              <p className="text-gray-600 mb-4">{playground.description}</p>
-            )}
-
-            {/* Payment info */}
-            {playground.is_paid && playground.payment_type && (
-              <div className="mt-4 bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200 rounded-lg p-4">
+          {/* Show loading skeleton while content is being prepared */}
+          {!showContent && (
+            <div className="bg-white rounded-lg shadow p-6 animate-pulse">
+              <div className="h-8 bg-gray-200 rounded w-3/4 mb-4"></div>
+              <div className="h-4 bg-gray-100 rounded w-full mb-2"></div>
+              <div className="h-4 bg-gray-100 rounded w-5/6 mb-6"></div>
+              
+              <div className="mt-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-lg p-4">
                 <div className="flex items-start gap-3">
-                  <div className="text-3xl">💰</div>
+                  <div className="text-3xl">🇧🇷</div>
                   <div className="flex-1">
-                    <h3 className="text-lg font-bold text-green-900 mb-2">
-                      Playground Remunerado
-                    </h3>
-                    <div className="space-y-2">
-                      <div className="flex items-baseline gap-2">
-                        <span className="text-2xl font-bold text-green-600">
-                          R$ {playground.payment_value?.toFixed(2)}
-                        </span>
-                        <span className="text-sm text-green-700">
-                          {playground.payment_type === "per_hour" &&
-                            "por hora trabalhada"}
-                          {playground.payment_type === "per_task" &&
-                            "por task completada"}
-                          {playground.payment_type === "per_goal" &&
-                            `ao completar ${playground.tasks_for_goal} tasks`}
-                        </span>
+                    <div className="h-6 bg-blue-200 rounded w-40 mb-2"></div>
+                    <div className="h-4 bg-blue-100 rounded w-full mb-3"></div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div className="bg-white rounded p-2">
+                        <div className="h-4 bg-gray-200 rounded w-16 mb-1"></div>
+                        <div className="h-5 bg-gray-300 rounded w-full"></div>
                       </div>
-                      {playground.payment_type === "per_hour" &&
-                        playground.max_time_per_task && (
-                          <p className="text-sm text-green-800">
-                            ⏱️ Tempo máximo pago:{" "}
-                            <span className="font-semibold">
-                              {playground.max_time_per_task} minutos por task
-                            </span>
-                          </p>
-                        )}
-                      <div className="bg-white bg-opacity-60 rounded p-2 mt-2">
-                        <p className="text-xs text-green-800">
-                          <strong>ℹ️ Como funciona:</strong> O tempo é contado
-                          apenas quando esta aba está ativa. Se você mudar de
-                          aba ou minimizar o navegador, o timer pausa
-                          automaticamente.
-                        </p>
+                      <div className="bg-white rounded p-2">
+                        <div className="h-4 bg-gray-200 rounded w-16 mb-1"></div>
+                        <div className="h-5 bg-gray-300 rounded w-full"></div>
                       </div>
                     </div>
                   </div>
                 </div>
               </div>
-            )}
-
-            {/* Course info badge */}
-            {playground.linked_course && (
-              <div className="mt-4 flex items-center gap-2 text-sm">
-                <span
-                  className={`px-3 py-1 rounded-full font-medium ${
-                    playground.user_course_progress?.completed
-                      ? "bg-green-100 text-green-800"
-                      : "bg-blue-100 text-blue-800"
-                  }`}
-                >
-                  {playground.user_course_progress?.completed
-                    ? "✓ Curso Concluído"
-                    : "📚 Curso Disponível"}
-                </span>
-                <span className="text-gray-600">
-                  {playground.linked_course.title} • Use a aba lateral
-                </span>
-              </div>
-            )}
-
-            {playground.type === "ab_testing" && (
-              <div className="flex items-center gap-2 text-sm text-gray-500">
-                <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full">
-                  Teste A/B
-                </span>
-                <span>Avaliação {currentStep + 1} de 2</span>
-              </div>
-            )}
-
-            {playground.support_text && (
-              <div
-                className="mt-4 p-4 bg-gray-50 rounded-lg prose max-w-none"
-                dangerouslySetInnerHTML={{ __html: playground.support_text }}
-              />
-            )}
-          </div>
-
-          {/* Model Embed */}
-          {currentModel && (
-            <ModelEmbed
-              embedCode={currentModel.embed_code}
-              modelKey={currentModel.model_key}
-              modelName={currentModel.model_name}
-            />
+            </div>
           )}
 
-          {/* Evaluation Form */}
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">
-              Questionário de Avaliação
-            </h2>
-            <EvaluationForm
-              questions={currentQuestions}
-              onSubmit={handleSubmitEvaluation}
-            />
-          </div>
+          {/* Actual content - only show when ready */}
+          {showContent && (
+            <div key={playgroundId}>
+              {/* Header */}
+              <div className="bg-white rounded-lg shadow p-6">
+                <h1 className="text-3xl font-bold text-gray-900 mb-2">
+                  {playground.name}
+                </h1>
+                {playground.description && (
+                  <p className="text-gray-600 mb-4">{playground.description}</p>
+                )}
+
+                {/* Brazilian Person Tool Skeleton */}
+                {(loadingBrazilianPerson ||
+                  !minTimeElapsed ||
+                  (playground?.tools?.some(
+                    (t: any) =>
+                      t.type === "generate_brazilian_person" && t.enabled
+                  ) &&
+                    !brazilianPerson)) && (
+                  <div className="mt-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-lg p-4 animate-pulse">
+                    <div className="flex items-start gap-3">
+                      <div className="text-3xl">🇧🇷</div>
+                      <div className="flex-1">
+                        <div className="h-6 bg-blue-200 rounded w-40 mb-2"></div>
+                        <div className="h-4 bg-blue-100 rounded w-full mb-3"></div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div className="bg-white rounded p-2">
+                            <div className="h-4 bg-gray-200 rounded w-16 mb-1"></div>
+                            <div className="h-5 bg-gray-300 rounded w-full"></div>
+                          </div>
+                          <div className="bg-white rounded p-2">
+                            <div className="h-4 bg-gray-200 rounded w-16 mb-1"></div>
+                            <div className="h-5 bg-gray-300 rounded w-full"></div>
+                          </div>
+                          <div className="bg-white rounded p-2">
+                            <div className="h-4 bg-gray-200 rounded w-24 mb-1"></div>
+                            <div className="h-5 bg-gray-300 rounded w-full"></div>
+                          </div>
+                          <div className="bg-white rounded p-2">
+                            <div className="h-4 bg-gray-200 rounded w-16 mb-1"></div>
+                            <div className="h-5 bg-gray-300 rounded w-full"></div>
+                          </div>
+                          <div className="bg-white rounded p-2 md:col-span-2">
+                            <div className="h-4 bg-gray-200 rounded w-20 mb-1"></div>
+                            <div className="h-5 bg-gray-300 rounded w-full"></div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Brazilian Person Tool */}
+                {brazilianPerson && (
+                    <div className="mt-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-lg p-4">
+                      <div className="flex items-start gap-3">
+                        <div className="text-3xl">🇧🇷</div>
+                        <div className="flex-1">
+                          <h3 className="text-lg font-bold text-blue-900 mb-2">
+                            Dados para Teste
+                          </h3>
+                          <p className="text-xs text-blue-700 mb-3 italic">
+                            ⚠️ Atenção: Estes são dados fictícios gerados apenas
+                            para fins de teste. Não representam uma pessoa real.
+                          </p>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                            <div className="bg-white rounded p-2">
+                              <span className="text-gray-600 font-medium">
+                                Nome:
+                              </span>
+                              <p className="text-gray-900 font-semibold">
+                                {brazilianPerson.nome_completo}
+                              </p>
+                            </div>
+                            <div className="bg-white rounded p-2">
+                              <span className="text-gray-600 font-medium">
+                                CPF:
+                              </span>
+                              <p className="text-gray-900 font-semibold font-mono">
+                                {brazilianPerson.cpf}
+                              </p>
+                            </div>
+                            <div className="bg-white rounded p-2">
+                              <span className="text-gray-600 font-medium">
+                                Data de Nascimento:
+                              </span>
+                              <p className="text-gray-900 font-semibold">
+                                {brazilianPerson.data_nascimento}
+                              </p>
+                            </div>
+                            <div className="bg-white rounded p-2">
+                              <span className="text-gray-600 font-medium">
+                                Sexo:
+                              </span>
+                              <p className="text-gray-900 font-semibold">
+                                {brazilianPerson.sexo}
+                              </p>
+                            </div>
+                            <div className="bg-white rounded p-2 md:col-span-2">
+                              <span className="text-gray-600 font-medium">
+                                Telefone:
+                              </span>
+                              <p className="text-gray-900 font-semibold font-mono">
+                                {brazilianPerson.telefone}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                {/* Random Selector Tool */}
+                {randomSelectorResult && (
+                    <div className="mt-4 bg-gradient-to-r from-purple-50 to-pink-50 border-2 border-purple-200 rounded-lg p-4">
+                      <div className="flex items-start gap-3">
+                        <div className="text-3xl">🎲</div>
+                        <div className="flex-1">
+                          <h3 className="text-lg font-bold text-purple-900 mb-2">
+                            {randomSelectorResult.title}
+                          </h3>
+                          <div className="bg-white rounded-lg p-4 border-2 border-purple-300">
+                            <p className="text-xl font-bold text-purple-900 text-center">
+                              {randomSelectorResult.selectedItem}
+                            </p>
+                          </div>
+                          <p className="text-xs text-purple-700 mt-2 italic">
+                            💡 Este item foi selecionado aleatoriamente para
+                            este teste
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                {/* Payment info */}
+                {playground.is_paid && playground.payment_type && (
+                  <div className="mt-4 bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200 rounded-lg p-4">
+                    <div className="flex items-start gap-3">
+                      <div className="text-3xl">💰</div>
+                      <div className="flex-1">
+                        <h3 className="text-lg font-bold text-green-900 mb-2">
+                          Playground Remunerado
+                        </h3>
+                        <div className="space-y-2">
+                          <div className="flex items-baseline gap-2">
+                            <span className="text-2xl font-bold text-green-600">
+                              R$ {playground.payment_value?.toFixed(2)}
+                            </span>
+                            <span className="text-sm text-green-700">
+                              {playground.payment_type === "per_hour" &&
+                                "por hora trabalhada"}
+                              {playground.payment_type === "per_task" &&
+                                "por task completada"}
+                              {playground.payment_type === "per_goal" &&
+                                `ao completar ${playground.tasks_for_goal} tasks`}
+                            </span>
+                          </div>
+                          {playground.payment_type === "per_hour" &&
+                            playground.max_time_per_task && (
+                              <p className="text-sm text-green-800">
+                                ⏱️ Tempo máximo pago:{" "}
+                                <span className="font-semibold">
+                                  {playground.max_time_per_task} minutos por
+                                  task
+                                </span>
+                              </p>
+                            )}
+                          <div className="bg-white bg-opacity-60 rounded p-2 mt-2">
+                            <p className="text-xs text-green-800">
+                              <strong>ℹ️ Como funciona:</strong> O tempo é
+                              contado apenas quando esta aba está ativa. Se você
+                              mudar de aba ou minimizar o navegador, o timer
+                              pausa automaticamente.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Course info badge */}
+                {playground.linked_course && (
+                  <div className="mt-4 flex items-center gap-2 text-sm">
+                    <span
+                      className={`px-3 py-1 rounded-full font-medium ${
+                        playground.user_course_progress?.completed
+                          ? "bg-green-100 text-green-800"
+                          : "bg-blue-100 text-blue-800"
+                      }`}
+                    >
+                      {playground.user_course_progress?.completed
+                        ? "✓ Curso Concluído"
+                        : "📚 Curso Disponível"}
+                    </span>
+                    <span className="text-gray-600">
+                      {playground.linked_course.title} • Use a aba lateral
+                    </span>
+                  </div>
+                )}
+
+                {playground.type === "ab_testing" && (
+                  <div className="flex items-center gap-2 text-sm text-gray-500">
+                    <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full">
+                      Teste A/B
+                    </span>
+                    <span>Avaliação {currentStep + 1} de 2</span>
+                  </div>
+                )}
+
+                {playground.support_text && (
+                  <div
+                    className="mt-4 p-4 bg-gray-50 rounded-lg prose max-w-none"
+                    dangerouslySetInnerHTML={{
+                      __html: playground.support_text,
+                    }}
+                  />
+                )}
+              </div>
+
+              {/* Model Embed */}
+              {currentModel && (
+                <ModelEmbed
+                  embedCode={currentModel.embed_code}
+                  modelKey={currentModel.model_key}
+                  modelName={currentModel.model_name}
+                />
+              )}
+
+              {/* Evaluation Form */}
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900 mb-4">
+                  Questionário de Avaliação
+                </h2>
+                <EvaluationForm
+                  questions={currentQuestions}
+                  onSubmit={handleSubmitEvaluation}
+                />
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Course Drawer - Always present when course is linked */}

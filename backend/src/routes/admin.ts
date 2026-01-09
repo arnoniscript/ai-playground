@@ -129,33 +129,52 @@ router.get('/playgrounds/:id', adminOnly, async (req: Request, res: Response) =>
  */
 router.post('/playgrounds', adminOnly, async (req: Request, res: Response) => {
   try {
+    console.log('=== POST /admin/playgrounds ===');
+    console.log('Request body tools:', req.body.tools);
+    
     const payload = CreatePlaygroundSchema.parse(req.body);
+    
+    console.log('Payload after schema parse:', {
+      tools: payload.tools,
+      toolsType: typeof payload.tools,
+      toolsLength: payload.tools?.length,
+    });
 
     // Create playground
     const playgroundId = uuidv4();
+    const insertData = {
+      id: playgroundId,
+      name: payload.name,
+      type: payload.type,
+      description: payload.description,
+      support_text: payload.support_text,
+      created_by: req.user?.id,
+      restricted_emails: payload.restricted_emails || null,
+      evaluation_goal: payload.evaluation_goal,
+      linked_course_id: payload.linked_course_id || null,
+      course_required: payload.course_required || false,
+      is_paid: payload.is_paid || false,
+      payment_type: payload.payment_type || null,
+      payment_value: payload.payment_value || null,
+      max_time_per_task: payload.max_time_per_task || null,
+      tasks_for_goal: payload.tasks_for_goal || null,
+      tools: payload.tools || [],
+    };
+    
+    console.log('Insert data tools:', insertData.tools);
+    
     const { data: playground, error: playgroundError } = await db
       .from('playgrounds')
-      .insert({
-        id: playgroundId,
-        name: payload.name,
-        type: payload.type,
-        description: payload.description,
-        support_text: payload.support_text,
-        created_by: req.user?.id,
-        restricted_emails: payload.restricted_emails || null,
-        evaluation_goal: payload.evaluation_goal,
-        linked_course_id: payload.linked_course_id || null,
-        course_required: payload.course_required || false,
-        is_paid: payload.is_paid || false,
-        payment_type: payload.payment_type || null,
-        payment_value: payload.payment_value || null,
-        max_time_per_task: payload.max_time_per_task || null,
-        tasks_for_goal: payload.tasks_for_goal || null,
-      })
+      .insert(insertData)
       .select()
       .single();
 
-    if (playgroundError) throw playgroundError;
+    if (playgroundError) {
+      console.error('Playground insert error:', playgroundError);
+      throw playgroundError;
+    }
+    
+    console.log('Playground created with tools:', playground.tools);
 
     // Create models
     const modelInserts = payload.models.map(model => ({
@@ -219,10 +238,14 @@ router.post('/playgrounds', adminOnly, async (req: Request, res: Response) => {
 router.put('/playgrounds/:id', adminOnly, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
+    
+    console.log('=== PUT /admin/playgrounds/:id ===');
+    console.log('ID:', id);
+    console.log('Request body tools:', req.body.tools);
+    
     const payload = UpdatePlaygroundSchema.parse(req.body);
 
-    console.log('PUT /admin/playgrounds/:id - ID:', id);
-    console.log('PUT /admin/playgrounds/:id - Payload:', payload);
+    console.log('PUT /admin/playgrounds/:id - Payload tools:', payload.tools);
     console.log('PUT /admin/playgrounds/:id - User:', req.user?.id);
 
     // Verify ownership
@@ -259,6 +282,7 @@ router.put('/playgrounds/:id', adminOnly, async (req: Request, res: Response) =>
     if (payload.payment_value !== undefined) updateData.payment_value = payload.payment_value;
     if (payload.max_time_per_task !== undefined) updateData.max_time_per_task = payload.max_time_per_task;
     if (payload.tasks_for_goal !== undefined) updateData.tasks_for_goal = payload.tasks_for_goal;
+    if (payload.tools !== undefined) updateData.tools = payload.tools;
 
     console.log('PUT /admin/playgrounds/:id - Update data:', updateData);
 

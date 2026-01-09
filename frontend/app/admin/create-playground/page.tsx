@@ -71,6 +71,16 @@ function CreatePlaygroundForm() {
   const [maxTimePerTask, setMaxTimePerTask] = useState<number>(0);
   const [tasksForGoal, setTasksForGoal] = useState<number>(0);
 
+  // Tools settings
+  const [enableBrazilianPersonGenerator, setEnableBrazilianPersonGenerator] =
+    useState<boolean>(false);
+  const [enableRandomSelector, setEnableRandomSelector] =
+    useState<boolean>(false);
+  const [randomSelectorTitle, setRandomSelectorTitle] = useState<string>("");
+  const [randomSelectorItems, setRandomSelectorItems] = useState<string[]>([
+    "",
+  ]);
+
   // Models
   const [models, setModels] = useState<ModelInput[]>([
     { key: "", embedCode: "" },
@@ -314,6 +324,38 @@ function CreatePlaygroundForm() {
     setIsSubmitting(true);
 
     try {
+      // Build tools array
+      const tools: any[] = [];
+
+      if (enableBrazilianPersonGenerator) {
+        tools.push({ type: "generate_brazilian_person", enabled: true });
+      }
+
+      if (
+        enableRandomSelector &&
+        randomSelectorTitle &&
+        randomSelectorItems.filter((i) => i.trim()).length > 0
+      ) {
+        tools.push({
+          type: "random_selector",
+          enabled: true,
+          config: {
+            title: randomSelectorTitle,
+            items: randomSelectorItems.filter((i) => i.trim()),
+          },
+        });
+      }
+
+      console.log("=== CREATING PLAYGROUND ===");
+      console.log("Tools array being sent:", tools);
+      console.log(
+        "enableBrazilianPersonGenerator:",
+        enableBrazilianPersonGenerator
+      );
+      console.log("enableRandomSelector:", enableRandomSelector);
+      console.log("randomSelectorTitle:", randomSelectorTitle);
+      console.log("randomSelectorItems:", randomSelectorItems);
+
       // Create playground with models and questions in single request
       const playgroundResponse = await api.post("/admin/playgrounds", {
         name,
@@ -331,6 +373,7 @@ function CreatePlaygroundForm() {
           isPaid && paymentType === "per_hour" ? maxTimePerTask : null,
         tasks_for_goal:
           isPaid && paymentType === "per_goal" ? tasksForGoal : null,
+        tools,
         models: models.map((m) => ({
           model_key: m.key,
           model_name: m.key, // Using key as name for now
@@ -693,6 +736,185 @@ function CreatePlaygroundForm() {
                     </div>
                   </>
                 )}
+              </div>
+            </section>
+
+            {/* Tools Configuration Section */}
+            <section className="bg-white border rounded-lg p-6">
+              <h2 className="text-xl font-semibold mb-4">Ferramentas</h2>
+              <p className="text-sm text-gray-600 mb-4">
+                Habilite ferramentas auxiliares que aparecerão no playground
+                para ajudar nos testes.
+              </p>
+
+              <div className="space-y-4">
+                <div className="flex items-start space-x-2">
+                  <input
+                    type="checkbox"
+                    id="enableBrazilianPersonGenerator"
+                    checked={enableBrazilianPersonGenerator}
+                    onChange={(e) =>
+                      setEnableBrazilianPersonGenerator(e.target.checked)
+                    }
+                    className="mt-1"
+                  />
+                  <div>
+                    <label
+                      htmlFor="enableBrazilianPersonGenerator"
+                      className="text-sm font-medium cursor-pointer"
+                    >
+                      Gerador de Pessoa Brasileira
+                    </label>
+                    <p className="text-xs text-gray-600 mt-1">
+                      Gera automaticamente dados fictícios de uma pessoa
+                      brasileira (nome, CPF válido, data de nascimento, sexo,
+                      telefone com DDD) para serem usados nos testes
+                    </p>
+                  </div>
+                </div>
+
+                {enableBrazilianPersonGenerator && (
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                    <h4 className="text-sm font-medium text-green-900 mb-2">
+                      ✅ Dados Gerados Incluem:
+                    </h4>
+                    <ul className="text-xs text-green-800 space-y-1">
+                      <li>• Nome completo compatível com o sexo</li>
+                      <li>
+                        • CPF válido (algoritmo oficial da Receita Federal)
+                      </li>
+                      <li>• Data de nascimento (pessoa entre 18-70 anos)</li>
+                      <li>• Sexo biológico (Masculino/Feminino)</li>
+                      <li>• Telefone celular com DDD brasileiro</li>
+                    </ul>
+                    <p className="text-xs text-green-700 mt-2 font-medium">
+                      Os dados aparecerão automaticamente abaixo da descrição do
+                      playground com aviso de que são fictícios.
+                    </p>
+                  </div>
+                )}
+
+                {/* Random Selector Tool */}
+                <div className="border-t pt-4 mt-4">
+                  <div className="flex items-start space-x-2">
+                    <input
+                      type="checkbox"
+                      id="enableRandomSelector"
+                      checked={enableRandomSelector}
+                      onChange={(e) =>
+                        setEnableRandomSelector(e.target.checked)
+                      }
+                      className="mt-1"
+                    />
+                    <div className="flex-1">
+                      <label
+                        htmlFor="enableRandomSelector"
+                        className="text-sm font-medium cursor-pointer"
+                      >
+                        Seletor Aleatório
+                      </label>
+                      <p className="text-xs text-gray-600 mt-1">
+                        Exibe um item aleatório de uma lista personalizada. Útil
+                        para sortear cenários, perfis, situações, etc.
+                      </p>
+                    </div>
+                  </div>
+
+                  {enableRandomSelector && (
+                    <div className="mt-4 space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium mb-1">
+                          Título da Seção *
+                        </label>
+                        <input
+                          type="text"
+                          value={randomSelectorTitle}
+                          onChange={(e) =>
+                            setRandomSelectorTitle(e.target.value)
+                          }
+                          placeholder="Ex: Perfil do Cliente, Cenário de Teste, Produto"
+                          className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-purple-500"
+                          required={enableRandomSelector}
+                        />
+                        <p className="text-xs text-gray-500 mt-1">
+                          Este título aparecerá no playground (não "Seletor
+                          Aleatório")
+                        </p>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium mb-1">
+                          Lista de Itens *
+                        </label>
+                        <div className="space-y-2">
+                          {randomSelectorItems.map((item, index) => (
+                            <div key={index} className="flex gap-2">
+                              <input
+                                type="text"
+                                value={item}
+                                onChange={(e) => {
+                                  const newItems = [...randomSelectorItems];
+                                  newItems[index] = e.target.value;
+                                  setRandomSelectorItems(newItems);
+                                }}
+                                placeholder={`Item ${index + 1}`}
+                                className="flex-1 px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-purple-500"
+                              />
+                              {randomSelectorItems.length > 1 && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setRandomSelectorItems(
+                                      randomSelectorItems.filter(
+                                        (_, i) => i !== index
+                                      )
+                                    );
+                                  }}
+                                  className="px-3 py-2 text-red-600 hover:bg-red-50 rounded"
+                                >
+                                  ✕
+                                </button>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setRandomSelectorItems([...randomSelectorItems, ""])
+                          }
+                          className="mt-2 px-4 py-2 text-sm bg-purple-50 text-purple-700 rounded hover:bg-purple-100"
+                        >
+                          + Adicionar Item
+                        </button>
+                        <p className="text-xs text-gray-500 mt-2">
+                          Um item será escolhido aleatoriamente e exibido no
+                          playground
+                        </p>
+                      </div>
+
+                      <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                        <h4 className="text-sm font-medium text-purple-900 mb-2">
+                          🎲 Como Funciona:
+                        </h4>
+                        <ul className="text-xs text-purple-800 space-y-1">
+                          <li>
+                            • Um item da lista será sorteado aleatoriamente
+                          </li>
+                          <li>
+                            • O item escolhido será exibido abaixo da descrição
+                          </li>
+                          <li>
+                            • O título personalizado aparecerá acima do item
+                          </li>
+                          <li>
+                            • Cada usuário verá um item diferente (aleatório)
+                          </li>
+                        </ul>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             </section>
 

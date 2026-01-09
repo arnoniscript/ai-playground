@@ -8,6 +8,22 @@ export type AccessControlType = 'open' | 'email_restricted' | 'explicit_authoriz
 export type PaymentType = 'per_hour' | 'per_task' | 'per_goal';
 export type EarningStatus = 'under_review' | 'ready_for_payment' | 'paid' | 'rejected';
 
+export interface PlaygroundToolBrazilianPerson {
+  type: 'generate_brazilian_person';
+  enabled: boolean;
+}
+
+export interface PlaygroundToolRandomSelector {
+  type: 'random_selector';
+  enabled: boolean;
+  config: {
+    title: string;
+    items: string[];
+  };
+}
+
+export type PlaygroundTool = PlaygroundToolBrazilianPerson | PlaygroundToolRandomSelector;
+
 export interface User {
   id: string;
   email: string;
@@ -42,6 +58,7 @@ export interface Playground {
   payment_value: number | null;
   max_time_per_task: number | null;
   tasks_for_goal: number | null;
+  tools: PlaygroundTool[];
   created_at: string;
   updated_at: string;
 }

@@ -2,6 +2,30 @@ export type UserRole = 'admin' | 'tester' | 'client' | 'qa' | 'manager';
 export type UserStatus = 'active' | 'pending_invite' | 'blocked' | 'pending_approval';
 export type AccessControlType = 'open' | 'email_restricted' | 'explicit_authorization';
 
+export interface PlaygroundToolBrazilianPerson {
+  type: 'generate_brazilian_person';
+  enabled: boolean;
+}
+
+export interface PlaygroundToolRandomSelector {
+  type: 'random_selector';
+  enabled: boolean;
+  config: {
+    title: string;
+    items: string[];
+  };
+}
+
+export type PlaygroundTool = PlaygroundToolBrazilianPerson | PlaygroundToolRandomSelector;
+
+export interface BrazilianPerson {
+  nome_completo: string;
+  cpf: string;
+  data_nascimento: string;
+  sexo: 'Masculino' | 'Feminino';
+  telefone: string;
+}
+
 export interface User {
   id: string;
   email: string;
@@ -36,6 +60,7 @@ export interface Playground {
   payment_value: number | null;
   max_time_per_task: number | null;
   tasks_for_goal: number | null;
+  tools: PlaygroundTool[];
   models?: ModelConfiguration[];
   questions?: Question[];
   counters?: EvaluationCounter[];
