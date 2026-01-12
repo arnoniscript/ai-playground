@@ -67,56 +67,76 @@ export function LoginForm() {
   };
 
   return (
-    <div className="w-full max-w-sm p-6 bg-white rounded-lg shadow-md">
-      <h1 className="text-2xl font-bold mb-2">AI Marisa Playground</h1>
+    <div className="w-full p-8 bg-white rounded-2xl shadow-xl">
+      <div className="mb-6">
+        <h2 className="text-3xl font-bold text-gray-800 mb-2">
+          {step === "email" ? "Bem-vindo!" : "Verificação"}
+        </h2>
+        <p className="text-gray-600">
+          {step === "email"
+            ? "Digite seu email para receber o código de acesso"
+            : "Digite o código de 6 dígitos enviado para seu email"}
+        </p>
+      </div>
 
       {isInvited && step === "email" && (
-        <div className="mb-4 p-3 bg-blue-50 text-blue-800 rounded-md border border-blue-200">
-          <p className="text-sm font-medium">🎉 Bem-vindo!</p>
-          <p className="text-sm mt-1">
-            Complete seu cadastro para acessar a plataforma.
-          </p>
+        <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl border border-blue-200">
+          <div className="flex items-start gap-3">
+            <span className="text-2xl">🎉</span>
+            <div>
+              <p className="font-semibold text-gray-800">Bem-vindo à equipe!</p>
+              <p className="text-sm text-gray-600 mt-1">
+                Complete seu cadastro para acessar a plataforma.
+              </p>
+            </div>
+          </div>
         </div>
       )}
 
-      <p className="text-gray-600 mb-6 text-sm">
-        {step === "email"
-          ? "Digite seu email para receber o código de acesso"
-          : "Digite o código enviado para seu email"}
-      </p>
-
       {step === "email" ? (
-        <form onSubmit={handleSendOTP}>
-          <div className="mb-4">
-            <label className="block text-sm font-medium mb-2">Email</label>
+        <form onSubmit={handleSendOTP} className="space-y-5">
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
+              Email
+            </label>
             <input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="seu.email@marisa.care"
               required
-              className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
             />
           </div>
 
           {error && (
-            <div className="mb-4 p-3 bg-red-100 text-red-700 rounded">
-              {error}
+            <div className="p-4 bg-red-50 border-l-4 border-red-500 text-red-700 rounded-lg">
+              <div className="flex items-start gap-2">
+                <span className="text-lg">⚠️</span>
+                <span className="text-sm">{error}</span>
+              </div>
             </div>
           )}
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700 disabled:opacity-50"
+            className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 rounded-xl hover:from-blue-700 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed font-semibold shadow-lg hover:shadow-xl transition-all"
           >
-            {loading ? "Enviando..." : "Enviar Código"}
+            {loading ? (
+              <span className="flex items-center justify-center gap-2">
+                <span className="animate-spin">⏳</span>
+                Enviando...
+              </span>
+            ) : (
+              "Enviar Código"
+            )}
           </button>
         </form>
       ) : (
-        <form onSubmit={handleVerifyOTP}>
-          <div className="mb-4">
-            <label className="block text-sm font-medium mb-2">
+        <form onSubmit={handleVerifyOTP} className="space-y-5">
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
               Código de Acesso
             </label>
             <input
@@ -126,30 +146,44 @@ export function LoginForm() {
               placeholder="000000"
               maxLength={6}
               required
-              className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-center text-2xl tracking-widest"
+              className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-center text-2xl tracking-widest font-bold"
             />
           </div>
 
           {error && (
-            <div className="mb-4 p-3 bg-red-100 text-red-700 rounded">
-              {error}
+            <div className="p-4 bg-red-50 border-l-4 border-red-500 text-red-700 rounded-lg">
+              <div className="flex items-start gap-2">
+                <span className="text-lg">⚠️</span>
+                <span className="text-sm">{error}</span>
+              </div>
             </div>
           )}
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700 disabled:opacity-50"
+            className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 rounded-xl hover:from-blue-700 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed font-semibold shadow-lg hover:shadow-xl transition-all"
           >
-            {loading ? "Verificando..." : "Verificar"}
+            {loading ? (
+              <span className="flex items-center justify-center gap-2">
+                <span className="animate-spin">⏳</span>
+                Verificando...
+              </span>
+            ) : (
+              "Verificar Código"
+            )}
           </button>
 
           <button
             type="button"
-            onClick={() => setStep("email")}
-            className="w-full mt-2 text-blue-600 hover:text-blue-700"
+            onClick={() => {
+              setStep("email");
+              setOtp("");
+              setError(null);
+            }}
+            className="w-full text-gray-600 py-2 rounded-xl hover:bg-gray-100 transition-all font-medium"
           >
-            Voltar
+            ← Voltar
           </button>
         </form>
       )}
