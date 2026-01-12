@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Layout } from "@/components/layout";
 import { AdminGuard } from "@/components/auth-guard";
 import api from "@/lib/api";
@@ -9,6 +9,7 @@ import { User, UserRole, UserStatus, BankAccount } from "@/lib/types";
 
 export default function UserManagementPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -44,7 +45,13 @@ export default function UserManagementPage() {
 
   useEffect(() => {
     fetchUsers();
-  }, []);
+
+    // Check if URL has filter=pending parameter
+    const filter = searchParams.get("filter");
+    if (filter === "pending") {
+      setStatusFilter("pending_approval");
+    }
+  }, [searchParams]);
 
   const fetchUsers = async () => {
     try {

@@ -14,10 +14,21 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [duplicating, setDuplicating] = useState<string | null>(null);
   const [showActive, setShowActive] = useState(true);
+  const [pendingUsersCount, setPendingUsersCount] = useState(0);
 
   useEffect(() => {
     fetchPlaygrounds();
+    fetchPendingUsers();
   }, []);
+
+  const fetchPendingUsers = async () => {
+    try {
+      const response = await api.get("/admin/pending-users-count");
+      setPendingUsersCount(response.data.data.count || 0);
+    } catch (error) {
+      console.error("Failed to fetch pending users count:", error);
+    }
+  };
 
   const fetchPlaygrounds = async () => {
     try {
@@ -81,6 +92,38 @@ export default function AdminDashboard() {
       <AuthGuard>
         <Layout>
           <div className="space-y-8">
+            {/* Pending Users Notification */}
+            {pendingUsersCount > 0 && (
+              <div className="bg-gradient-to-r from-amber-50 to-orange-50 border-l-4 border-orange-500 rounded-lg shadow-md">
+                <div className="p-4 flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="bg-orange-500 text-white rounded-full w-12 h-12 flex items-center justify-center font-bold text-lg">
+                      {pendingUsersCount}
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-gray-900 text-lg">
+                        {pendingUsersCount === 1
+                          ? "Novo usuário aguardando aprovação"
+                          : `${pendingUsersCount} usuários aguardando aprovação`}
+                      </h3>
+                      <p className="text-gray-700 text-sm">
+                        {pendingUsersCount === 1
+                          ? "Há um usuário que precisa ser aprovado ou reprovado"
+                          : "Há usuários que precisam ser aprovados ou reprovados"}
+                      </p>
+                    </div>
+                  </div>
+                  <Link href="/admin/users?filter=pending">
+                    <button className="px-6 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-600 font-medium transition-colors shadow-sm flex items-center gap-2">
+                      <span>👥</span>
+                      <span>Ver Usuários Pendentes</span>
+                      <span>→</span>
+                    </button>
+                  </Link>
+                </div>
+              </div>
+            )}
+
             <div className="flex justify-between items-center">
               <div>
                 <h1 className="text-3xl font-bold">Dashboard Admin</h1>

@@ -1659,4 +1659,32 @@ router.delete('/users/:id', adminOnly, async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * GET /admin/pending-users-count
+ * Get count of users pending approval
+ */
+router.get('/pending-users-count', adminOnly, async (req: Request, res: Response) => {
+  try {
+    const { count, error } = await db
+      .from('users')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'pending_approval');
+
+    if (error) {
+      console.error('Error counting pending users:', error);
+      res.status(500).json({ error: 'Failed to count pending users' });
+      return;
+    }
+
+    res.json({ 
+      data: { 
+        count: count || 0 
+      } 
+    });
+  } catch (error) {
+    console.error('Error in GET /admin/pending-users-count:', error);
+    res.status(500).json({ error: 'Failed to count pending users' });
+  }
+});
+
 export default router;

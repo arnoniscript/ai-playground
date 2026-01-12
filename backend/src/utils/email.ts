@@ -4,6 +4,23 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 const emailFrom = process.env.EMAIL_FROM || "onboarding@resend.dev";
 const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
 
+// Logo HTML component for emails
+const emailLogoHTML = `
+  <div style="display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 24px;">
+    <div style="background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%); width: 48px; height: 48px; border-radius: 16px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 6px rgba(59, 130, 246, 0.3);">
+      <span style="color: #ffffff; font-weight: bold; font-size: 20px;">AI</span>
+    </div>
+    <div style="text-align: left;">
+      <div style="background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; font-size: 24px; font-weight: bold; line-height: 1;">
+        Marisa
+      </div>
+      <div style="color: #6b7280; font-size: 10px; font-weight: 500; letter-spacing: 0.05em; margin-top: 2px;">
+        PLAYGROUND
+      </div>
+    </div>
+  </div>
+`;
+
 interface SendInviteEmailParams {
   to: string;
   inviterName?: string;
@@ -33,9 +50,10 @@ export async function sendInviteEmail({ to, inviterName, fullName }: SendInviteE
               <td align="center">
                 <table width="100%" cellpadding="0" cellspacing="0" style="max-width: 600px; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
                   
-                  <!-- Header -->
+                  <!-- Header with Logo -->
                   <tr>
                     <td style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 40px 30px; text-align: center;">
+                      ${emailLogoHTML}
                       <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 600;">
                         🎉 Bem-vindo ao Playground de IA
                       </h1>
@@ -247,8 +265,10 @@ export async function sendQARegistrationPendingEmail({ to, fullName, language }:
               <td align="center">
                 <table width="100%" cellpadding="0" cellspacing="0" style="max-width: 600px; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
                   
+                  <!-- Header with Logo -->
                   <tr>
                     <td style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 40px 30px; text-align: center;">
+                      ${emailLogoHTML}
                       <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 600;">
                         ${content.title}
                       </h1>
@@ -324,8 +344,10 @@ export async function sendQAApprovedEmail({ to, fullName, language }: SendQAEmai
               <td align="center">
                 <table width="100%" cellpadding="0" cellspacing="0" style="max-width: 600px; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
                   
+                  <!-- Header with Logo -->
                   <tr>
                     <td style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 40px 30px; text-align: center;">
+                      ${emailLogoHTML}
                       <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 600;">
                         ✅ ${content.title}
                       </h1>
@@ -410,8 +432,10 @@ export async function sendQARejectedEmail({ to, fullName, language, reason }: Se
               <td align="center">
                 <table width="100%" cellpadding="0" cellspacing="0" style="max-width: 600px; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
                   
+                  <!-- Header with Logo -->
                   <tr>
                     <td style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 40px 30px; text-align: center;">
+                      ${emailLogoHTML}
                       <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 600;">
                         ${content.title}
                       </h1>
