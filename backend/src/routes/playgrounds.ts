@@ -66,7 +66,7 @@ router.get('/', async (req: Request, res: Response) => {
           // For data labeling playgrounds, fetch parent task metrics
           const { data: metrics } = await db
             .from('parent_tasks')
-            .select('status')
+            .select('id, status')
             .eq('playground_id', playground.id);
 
           const totalTasks = metrics?.length || 0;
