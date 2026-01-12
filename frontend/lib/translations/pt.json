@@ -125,6 +125,8 @@
     "pending": {
       "title": "Cadastro em Análise",
       "subtitle": "Seu cadastro foi recebido com sucesso!",
+      "message": "Seu cadastro foi recebido e está em análise. Nossa equipe verificará suas informações e você receberá a resposta por email em até 3 dias úteis.",
+      "close": "Fechar",
       "timeline": {
         "title": "O que acontece agora?",
         "step1": "Cadastro recebido",

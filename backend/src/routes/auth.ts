@@ -15,11 +15,50 @@ const router = Router();
 // In-memory OTP store (in production, use Redis or database)
 const otpStore: Record<string, { code: string; expiresAt: number }> = {};
 
+// Rate limiting store for login attempts (IP -> timestamps array)
+const loginRateLimitStore: Record<string, number[]> = {};
+
+// Rate limit configuration
+const RATE_LIMIT_MAX_REQUESTS = 5;
+const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute
+
+/**
+ * Middleware to check rate limit for login attempts
+ */
+const loginRateLimiter = (req: Request, res: Response, next: Function) => {
+  const ip = req.ip || req.socket.remoteAddress || 'unknown';
+  const now = Date.now();
+  
+  // Initialize or get request timestamps for this IP
+  if (!loginRateLimitStore[ip]) {
+    loginRateLimitStore[ip] = [];
+  }
+  
+  // Remove timestamps outside the window
+  loginRateLimitStore[ip] = loginRateLimitStore[ip].filter(
+    timestamp => now - timestamp < RATE_LIMIT_WINDOW_MS
+  );
+  
+  // Check if limit exceeded
+  if (loginRateLimitStore[ip].length >= RATE_LIMIT_MAX_REQUESTS) {
+    res.status(429).json({
+      error: 'Limite de tentativas excedido',
+      message: 'Você excedeu o limite de tentativas de login. Tente novamente mais tarde.',
+    });
+    return;
+  }
+  
+  // Add current timestamp
+  loginRateLimitStore[ip].push(now);
+  
+  next();
+};
+
 /**
  * POST /auth/signup
  * Request email and send OTP
  */
-router.post('/signup', asyncHandler(async (req: Request, res: Response) => {
+router.post('/signup', loginRateLimiter, asyncHandler(async (req: Request, res: Response) => {
   const { email } = SignupRequestSchema.parse(req.body);
 
   const isMarisaDomain = validateEmailDomain(email);
@@ -35,7 +74,7 @@ router.post('/signup', asyncHandler(async (req: Request, res: Response) => {
   if (!isMarisaDomain && !user.data) {
     res.status(403).json({
       error: 'Access denied',
-      message: `Only users from ${config.auth.allowedEmailDomain} domain or invited users can access this platform.`,
+      message: `Apenas usuários do domínio ${config.auth.allowedEmailDomain} ou usuários convidados podem acessar esta plataforma.`,
     });
     return;
   }
@@ -126,7 +165,7 @@ router.post('/signup', asyncHandler(async (req: Request, res: Response) => {
  * POST /auth/verify
  * Verify OTP and return JWT token
  */
-router.post('/verify', asyncHandler(async (req: Request, res: Response) => {
+router.post('/verify', loginRateLimiter, asyncHandler(async (req: Request, res: Response) => {
   const { email, code } = VerifyOTPSchema.parse(req.body);
 
   // Check OTP

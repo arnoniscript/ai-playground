@@ -71,6 +71,7 @@ export function RegisterQAModal({ isOpen, onClose }: RegisterQAModalProps) {
   const [currentStep, setCurrentStep] = useState(1);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
+  const [isSubmitted, setIsSubmitted] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
 
@@ -752,9 +753,8 @@ export function RegisterQAModal({ isOpen, onClose }: RegisterQAModalProps) {
         throw new Error(data.error || "Registration failed");
       }
 
-      // Close modal and redirect
-      onClose();
-      router.push(data.redirect || "/register-qa/pending");
+      // Show success screen inside modal
+      setIsSubmitted(true);
     } catch (error: any) {
       setErrors({ submit: error.message });
     } finally {
@@ -783,6 +783,9 @@ export function RegisterQAModal({ isOpen, onClose }: RegisterQAModalProps) {
               stream.getTracks().forEach((track) => track.stop());
             }
             onClose();
+            // Reset state when closing
+            setIsSubmitted(false);
+            setCurrentStep(1);
           }}
           className="absolute top-4 right-4 z-10 w-10 h-10 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 transition-colors"
         >
@@ -791,91 +794,157 @@ export function RegisterQAModal({ isOpen, onClose }: RegisterQAModalProps) {
 
         {/* Content */}
         <div className="overflow-y-auto max-h-[90vh] p-8">
-          {/* Header */}
-          <div className="mb-6">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="bg-gradient-to-br from-blue-600 to-purple-600 w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg">
-                <span className="text-white font-bold text-xl">AI</span>
+          {isSubmitted ? (
+            // Success Screen
+            <div className="flex flex-col py-12">
+              {/* Logo - Aligned Left */}
+              <div className="mb-8">
+                <div className="flex items-center gap-3">
+                  <div className="bg-gradient-to-br from-blue-600 to-purple-600 w-16 h-16 rounded-2xl flex items-center justify-center shadow-lg">
+                    <span className="text-white font-bold text-2xl">AI</span>
+                  </div>
+                  <div className="text-left">
+                    <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                      Marisa
+                    </h1>
+                    <p className="text-xs text-gray-500 font-medium tracking-wider">
+                      PLAYGROUND
+                    </p>
+                  </div>
+                </div>
               </div>
-              <div>
-                <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                  Marisa
-                </h1>
-                <p className="text-xs text-gray-500 font-medium">
-                  QA REGISTRATION
+
+              {/* Content - Centered */}
+              <div className="flex flex-col items-center text-center">
+                {/* Success Icon */}
+                <div className="w-24 h-24 rounded-full bg-gradient-to-br from-amber-50 to-orange-50 flex items-center justify-center mb-6">
+                  <svg
+                    className="w-12 h-12 text-orange-500"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
+                  </svg>
+                </div>
+
+                {/* Title */}
+                <h2 className="text-2xl font-bold text-gray-900 mb-3">
+                  {t("qa.pending.title")}
+                </h2>
+
+                {/* Message */}
+                <p className="text-gray-600 mb-8 max-w-md leading-relaxed">
+                  {t("qa.pending.message")}
                 </p>
+
+                {/* Close Button */}
+                <button
+                  onClick={() => {
+                    onClose();
+                    setIsSubmitted(false);
+                    setCurrentStep(1);
+                  }}
+                  className="px-8 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-700 hover:to-purple-700 font-medium transition-all"
+                >
+                  {t("qa.pending.close")}
+                </button>
               </div>
             </div>
+          ) : (
+            <>
+              {/* Header */}
+              <div className="mb-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="bg-gradient-to-br from-blue-600 to-purple-600 w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg">
+                    <span className="text-white font-bold text-xl">AI</span>
+                  </div>
+                  <div>
+                    <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                      Marisa
+                    </h1>
+                    <p className="text-xs text-gray-500 font-medium">
+                      QA REGISTRATION
+                    </p>
+                  </div>
+                </div>
 
-            {/* Progress Bar */}
-            <div className="mt-6">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium text-gray-700">
-                  {t("qa.registration.progress")}: {currentStep}/8
-                </span>
-                <span className="text-sm text-gray-500">
-                  {Math.round((currentStep / 8) * 100)}%
-                </span>
+                {/* Progress Bar */}
+                <div className="mt-6">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium text-gray-700">
+                      {t("qa.registration.progress")}: {currentStep}/8
+                    </span>
+                    <span className="text-sm text-gray-500">
+                      {Math.round((currentStep / 8) * 100)}%
+                    </span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div
+                      className="bg-gradient-to-r from-indigo-600 to-purple-600 h-2 rounded-full transition-all duration-300"
+                      style={{ width: `${(currentStep / 8) * 100}%` }}
+                    />
+                  </div>
+                </div>
               </div>
-              <div className="w-full bg-gray-200 rounded-full h-2">
-                <div
-                  className="bg-gradient-to-r from-indigo-600 to-purple-600 h-2 rounded-full transition-all duration-300"
-                  style={{ width: `${(currentStep / 8) * 100}%` }}
-                />
+
+              {/* Steps */}
+              <div className="mb-6">
+                {currentStep === 1 && renderStep1()}
+                {currentStep === 2 && renderStep2()}
+                {currentStep === 3 && renderStep3()}
+                {currentStep === 4 && renderStep4()}
+                {currentStep === 5 && renderStep5()}
+                {currentStep === 6 && renderStep6()}
+                {currentStep === 7 && renderStep7()}
+                {currentStep === 8 && renderStep8()}
               </div>
-            </div>
-          </div>
 
-          {/* Steps */}
-          <div className="mb-6">
-            {currentStep === 1 && renderStep1()}
-            {currentStep === 2 && renderStep2()}
-            {currentStep === 3 && renderStep3()}
-            {currentStep === 4 && renderStep4()}
-            {currentStep === 5 && renderStep5()}
-            {currentStep === 6 && renderStep6()}
-            {currentStep === 7 && renderStep7()}
-            {currentStep === 8 && renderStep8()}
-          </div>
+              {/* Error Message */}
+              {errors.submit && (
+                <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+                  <p className="text-red-800">{errors.submit}</p>
+                </div>
+              )}
 
-          {/* Error Message */}
-          {errors.submit && (
-            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
-              <p className="text-red-800">{errors.submit}</p>
-            </div>
+              {/* Navigation Buttons */}
+              <div className="flex justify-between pt-6 border-t border-gray-200">
+                {currentStep > 1 && (
+                  <button
+                    onClick={prevStep}
+                    className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                  >
+                    ← {t("qa.registration.previous")}
+                  </button>
+                )}
+
+                {currentStep < 8 ? (
+                  <button
+                    onClick={nextStep}
+                    className="ml-auto px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+                  >
+                    {t("qa.registration.next")} →
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleSubmit}
+                    disabled={loading || !formData.terms_accepted}
+                    className="ml-auto px-8 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:from-indigo-700 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {loading
+                      ? t("qa.registration.submitting")
+                      : t("qa.registration.submit")}{" "}
+                    🚀
+                  </button>
+                )}
+              </div>
+            </>
           )}
-
-          {/* Navigation Buttons */}
-          <div className="flex justify-between pt-6 border-t border-gray-200">
-            {currentStep > 1 && (
-              <button
-                onClick={prevStep}
-                className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
-              >
-                ← {t("qa.registration.previous")}
-              </button>
-            )}
-
-            {currentStep < 8 ? (
-              <button
-                onClick={nextStep}
-                className="ml-auto px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
-              >
-                {t("qa.registration.next")} →
-              </button>
-            ) : (
-              <button
-                onClick={handleSubmit}
-                disabled={loading || !formData.terms_accepted}
-                className="ml-auto px-8 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:from-indigo-700 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {loading
-                  ? t("qa.registration.submitting")
-                  : t("qa.registration.submit")}{" "}
-                🚀
-              </button>
-            )}
-          </div>
         </div>
       </div>
     </div>

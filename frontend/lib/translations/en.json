@@ -125,6 +125,8 @@
     "pending": {
       "title": "Registration Under Review",
       "subtitle": "Your registration was received successfully!",
+      "message": "Your registration has been received and is under review. Our team will verify your information and you will receive the response by email within 3 business days.",
+      "close": "Close",
       "timeline": {
         "title": "What happens now?",
         "step1": "Registration received",

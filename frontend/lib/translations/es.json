@@ -125,6 +125,8 @@
     "pending": {
       "title": "Registro en Revisión",
       "subtitle": "¡Su registro fue recibido exitosamente!",
+      "message": "Su registro ha sido recibido y está en revisión. Nuestro equipo verificará su información y recibirá la respuesta por correo electrónico en hasta 3 días hábiles.",
+      "close": "Cerrar",
       "timeline": {
         "title": "¿Qué sucede ahora?",
         "step1": "Registro recibido",
