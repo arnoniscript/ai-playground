@@ -45,7 +45,7 @@ export interface User {
 export interface Playground {
   id: string;
   name: string;
-  type: 'ab_testing' | 'tuning';
+  type: 'ab_testing' | 'tuning' | 'data_labeling';
   description: string | null;
   support_text: string | null;
   created_by: string;
@@ -61,6 +61,16 @@ export interface Playground {
   max_time_per_task: number | null;
   tasks_for_goal: number | null;
   tools: PlaygroundTool[];
+  // Data labeling specific fields
+  repetitions_per_task: number | null;
+  auto_calculate_evaluations: boolean;
+  has_returned_tasks: boolean;
+  data_labeling_progress?: {
+    total_tasks: number;
+    consolidated_tasks: number;
+    expected_evaluations: number;
+    completed_evaluations: number;
+  };
   models?: ModelConfiguration[];
   questions?: Question[];
   counters?: EvaluationCounter[];
@@ -98,7 +108,7 @@ export interface Question {
   playground_id: string;
   model_key: string | null;
   question_text: string;
-  question_type: 'select' | 'input_string';
+  question_type: 'select' | 'input_string' | 'boolean';
   options: Array<{ label: string; value: string }> | null;
   order_index: number;
   required: boolean;
@@ -359,4 +369,82 @@ export interface BankAccount {
   
   created_at: string;
   updated_at: string;
+}
+
+// Data Labeling System Types
+
+export type ParentTaskStatus = 'active' | 'consolidated' | 'returned_to_pipe' | 'ignored';
+export type FileType = 'image' | 'pdf' | 'text';
+
+export interface ParentTask {
+  id: string;
+  playground_id: string;
+  file_name: string;
+  file_type: FileType;
+  file_url: string;
+  file_size: number | null;
+  max_repetitions: number;
+  current_repetitions: number;
+  status: ParentTaskStatus;
+  consolidated_at: string | null;
+  consolidated_by: string | null;
+  admin_notes: string | null;
+  ignore_reason: string | null;
+  extra_repetitions: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface NextParentTask {
+  parent_task_id: string;
+  file_name: string;
+  file_type: FileType;
+  file_url: string;
+}
+
+export interface ParentTaskEvaluation {
+  user_id: string;
+  user_email: string;
+  user_name: string | null;
+  evaluated_at: string;
+  session_id: string;
+  answers: Array<{
+    question_id: string;
+    question_text: string;
+    question_type: 'select' | 'input_string' | 'boolean';
+    answer: string;
+    is_correct: boolean | null;
+  }>;
+}
+
+export interface ConsolidatedAnswer {
+  question_id: string;
+  question_text: string;
+  question_type: 'select' | 'input_string' | 'boolean';
+  answer_value?: string;
+  answer_text?: string;
+  source_evaluation_id?: string; // if selected from existing evaluation
+}
+
+export interface ParentTaskWithEvaluations extends ParentTask {
+  evaluations: ParentTaskEvaluation[];
+  consolidated_answers?: ConsolidatedAnswer[];
+}
+
+export interface DataLabelingMetrics {
+  total_parent_tasks: number;
+  active_parent_tasks: number;
+  consolidated_parent_tasks: number;
+  returned_parent_tasks: number;
+  total_expected_evaluations: number;
+  completed_evaluations: number;
+  completion_percentage: number;
+  has_returned_tasks: boolean;
+}
+
+export interface ConsolidateParentTaskRequest {
+  parent_task_id: string;
+  action: 'consolidate' | 'return_to_pipe';
+  admin_notes?: string;
+  extra_repetitions?: number;
 }

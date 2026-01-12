@@ -22,6 +22,23 @@ export default function AdminDashboard() {
   const fetchPlaygrounds = async () => {
     try {
       const response = await api.get("/admin/playgrounds");
+      console.log("=== [ADMIN] PLAYGROUNDS RECEIVED ===");
+      console.log("[ADMIN] Total playgrounds:", response.data.data?.length);
+      response.data.data?.forEach((pg: any) => {
+        console.log(`\n[ADMIN] Playground: ${pg.name}`);
+        console.log(`[ADMIN] Type: ${pg.type}`);
+        console.log(
+          `[ADMIN] Has data_labeling_progress:`,
+          !!pg.data_labeling_progress
+        );
+        if (pg.data_labeling_progress) {
+          console.log("[ADMIN] Progress data:", pg.data_labeling_progress);
+        }
+        console.log(`[ADMIN] Has counters:`, !!pg.counters);
+        if (pg.counters) {
+          console.log("[ADMIN] Counters:", pg.counters);
+        }
+      });
       setPlaygrounds(response.data.data || []);
     } catch (error) {
       console.error("Failed to fetch playgrounds:", error);
@@ -200,6 +217,8 @@ export default function AdminDashboard() {
                               <span className="text-lg font-bold text-gray-900">
                                 {playground.type === "ab_testing"
                                   ? "📊 A/B Testing"
+                                  : playground.type === "data_labeling"
+                                  ? "🏷️ Rotulação"
                                   : "🎯 Tuning"}
                               </span>
                             </div>
@@ -208,10 +227,14 @@ export default function AdminDashboard() {
                                 Avaliações
                               </span>
                               <span className="text-lg font-bold text-blue-600">
-                                {playground.counters?.reduce(
-                                  (sum, c) => sum + c.current_count,
-                                  0
-                                ) || 0}
+                                {playground.type === "data_labeling" &&
+                                playground.data_labeling_progress
+                                  ? playground.data_labeling_progress
+                                      .completed_evaluations
+                                  : playground.counters?.reduce(
+                                      (sum, c) => sum + c.current_count,
+                                      0
+                                    ) || 0}
                               </span>
                             </div>
                             <div className="flex flex-col">
@@ -223,27 +246,62 @@ export default function AdminDashboard() {
                                   <div
                                     className="bg-blue-600 h-2.5 rounded-full transition-all duration-300"
                                     style={{
-                                      width: `${Math.min(
-                                        100,
-                                        ((playground.counters?.reduce(
-                                          (sum, c) => sum + c.current_count,
-                                          0
-                                        ) || 0) /
-                                          (playground.evaluation_goal || 1)) *
-                                          100
-                                      )}%`,
+                                      width: `${(() => {
+                                        let total = 0;
+                                        let goal =
+                                          playground.evaluation_goal || 1;
+
+                                        if (
+                                          playground.type === "data_labeling" &&
+                                          playground.data_labeling_progress
+                                        ) {
+                                          total =
+                                            playground.data_labeling_progress
+                                              .completed_evaluations;
+                                          goal =
+                                            playground.data_labeling_progress
+                                              .expected_evaluations || goal;
+                                        } else {
+                                          total =
+                                            playground.counters?.reduce(
+                                              (sum, c) => sum + c.current_count,
+                                              0
+                                            ) || 0;
+                                        }
+
+                                        return Math.min(
+                                          100,
+                                          (total / goal) * 100
+                                        );
+                                      })()}%`,
                                     }}
                                   ></div>
                                 </div>
                                 <span className="text-sm font-bold text-gray-900 min-w-[45px]">
-                                  {Math.round(
-                                    ((playground.counters?.reduce(
-                                      (sum, c) => sum + c.current_count,
-                                      0
-                                    ) || 0) /
-                                      (playground.evaluation_goal || 1)) *
-                                      100
-                                  )}
+                                  {(() => {
+                                    let total = 0;
+                                    let goal = playground.evaluation_goal || 1;
+
+                                    if (
+                                      playground.type === "data_labeling" &&
+                                      playground.data_labeling_progress
+                                    ) {
+                                      total =
+                                        playground.data_labeling_progress
+                                          .completed_evaluations;
+                                      goal =
+                                        playground.data_labeling_progress
+                                          .expected_evaluations || goal;
+                                    } else {
+                                      total =
+                                        playground.counters?.reduce(
+                                          (sum, c) => sum + c.current_count,
+                                          0
+                                        ) || 0;
+                                    }
+
+                                    return Math.round((total / goal) * 100);
+                                  })()}
                                   %
                                 </span>
                               </div>

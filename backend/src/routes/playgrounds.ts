@@ -60,15 +60,77 @@ router.get('/', async (req: Request, res: Response) => {
     // Fetch counters for each playground
     const playgroundsWithCounters = await Promise.all(
       (playgrounds || []).map(async (playground) => {
-        const { data: counters } = await db
-          .from('evaluation_counters')
-          .select('*')
-          .eq('playground_id', playground.id);
+        if (playground.type === 'data_labeling') {
+          console.log(`\n=== Processing Data Labeling Playground: ${playground.name} ===`);
+          
+          // For data labeling playgrounds, fetch parent task metrics
+          const { data: metrics } = await db
+            .from('parent_tasks')
+            .select('status')
+            .eq('playground_id', playground.id);
 
-        return {
-          ...playground,
-          counters,
-        };
+          const totalTasks = metrics?.length || 0;
+          const consolidatedTasks = metrics?.filter(m => m.status === 'consolidated').length || 0;
+          
+          console.log(`Total tasks: ${totalTasks}`);
+          console.log(`Repetitions per task: ${playground.repetitions_per_task}`);
+          
+          // Calculate expected evaluations based on repetitions
+          const expectedEvaluations = totalTasks * (playground.repetitions_per_task || 1);
+          
+          console.log(`Expected evaluations: ${expectedEvaluations}`);
+          
+          // Count completed evaluations - need to get them through parent_tasks
+          // since evaluations are linked to parent_task_id, not playground_id
+          const taskIds = metrics?.map(m => m.id) || [];
+          
+          let completedCount = 0;
+          if (taskIds.length > 0) {
+            const { data: parentTasks } = await db
+              .from('parent_tasks')
+              .select('id')
+              .eq('playground_id', playground.id);
+            
+            const parentTaskIds = parentTasks?.map(t => t.id) || [];
+            
+            if (parentTaskIds.length > 0) {
+              const { count: completedEvaluations } = await db
+                .from('parent_task_evaluations')
+                .select('id', { count: 'exact', head: true })
+                .in('parent_task_id', parentTaskIds);
+              
+              completedCount = completedEvaluations ?? 0;
+            }
+          }
+          
+          console.log(`Completed evaluations: ${completedCount}`);
+
+          const progressData = {
+            total_tasks: totalTasks,
+            consolidated_tasks: consolidatedTasks,
+            expected_evaluations: expectedEvaluations,
+            completed_evaluations: completedCount,
+          };
+          
+          console.log('Progress data:', progressData);
+
+          return {
+            ...playground,
+            counters: [], // Empty for data_labeling
+            data_labeling_progress: progressData
+          };
+        } else {
+          // For AB testing and tuning, fetch model counters
+          const { data: counters } = await db
+            .from('evaluation_counters')
+            .select('*')
+            .eq('playground_id', playground.id);
+
+          return {
+            ...playground,
+            counters,
+          };
+        }
       })
     );
 
@@ -227,33 +289,36 @@ router.post('/:id/evaluations', async (req: Request, res: Response) => {
       return;
     }
 
-    // Check if model still has evaluations available
-    const { data: counter, error: counterError } = await db
-      .from('evaluation_counters')
-      .select('*')
-      .eq('playground_id', playgroundId)
-      .eq('model_key', payload.model_key)
-      .single();
+    // Skip model-specific checks for data_labeling playgrounds
+    if (playground.type !== 'data_labeling') {
+      // Check if model still has evaluations available
+      const { data: counter, error: counterError } = await db
+        .from('evaluation_counters')
+        .select('*')
+        .eq('playground_id', playgroundId)
+        .eq('model_key', payload.model_key!)
+        .single();
 
-    if (counterError || !counter) {
-      res.status(404).json({ error: 'Model not found' });
-      return;
-    }
+      if (counterError || !counter) {
+        res.status(404).json({ error: 'Model not found' });
+        return;
+      }
 
-    // Get model configuration to check max evaluations
-    const { data: modelConfig } = await db
-      .from('model_configurations')
-      .select('*')
-      .eq('playground_id', playgroundId)
-      .eq('model_key', payload.model_key)
-      .single();
+      // Get model configuration to check max evaluations
+      const { data: modelConfig } = await db
+        .from('model_configurations')
+        .select('*')
+        .eq('playground_id', playgroundId)
+        .eq('model_key', payload.model_key!)
+        .single();
 
-    if (!modelConfig || counter.current_count >= modelConfig.max_evaluations) {
-      res.status(409).json({
-        error: 'Model evaluation limit reached',
-        message: 'This playground model has reached its maximum number of evaluations',
-      });
-      return;
+      if (!modelConfig || counter.current_count >= modelConfig.max_evaluations) {
+        res.status(409).json({
+          error: 'Model evaluation limit reached',
+          message: 'This playground model has reached its maximum number of evaluations',
+        });
+        return;
+      }
     }
 
     // Insert evaluations
@@ -261,7 +326,7 @@ router.post('/:id/evaluations', async (req: Request, res: Response) => {
       id: uuidv4(),
       playground_id: playgroundId,
       user_id: req.user?.id,
-      model_key: payload.model_key,
+      model_key: payload.model_key || null, // null for data_labeling playgrounds
       question_id: answer.question_id,
       answer_text: answer.answer_text || null,
       answer_value: answer.answer_value || null,
@@ -279,16 +344,27 @@ router.post('/:id/evaluations', async (req: Request, res: Response) => {
       return;
     }
 
-    // Increment counter
-    const { error: updateError } = await db
-      .from('evaluation_counters')
-      .update({ current_count: counter.current_count + 1 })
-      .eq('id', counter.id);
+    // Increment counter (only for non-data_labeling playgrounds)
+    if (playground.type !== 'data_labeling') {
+      const { data: counter } = await db
+        .from('evaluation_counters')
+        .select('*')
+        .eq('playground_id', playgroundId)
+        .eq('model_key', payload.model_key!)
+        .single();
 
-    if (updateError) {
-      console.error('Error updating counter:', updateError);
-      res.status(500).json({ error: 'Failed to update counter' });
-      return;
+      if (counter) {
+        const { error: updateError } = await db
+          .from('evaluation_counters')
+          .update({ current_count: counter.current_count + 1 })
+          .eq('id', counter.id);
+
+        if (updateError) {
+          console.error('Error updating counter:', updateError);
+          res.status(500).json({ error: 'Failed to update counter' });
+          return;
+        }
+      }
     }
 
     // If playground is paid and user is QA, calculate and save earning

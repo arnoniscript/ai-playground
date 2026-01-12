@@ -1,0 +1,166 @@
+Substitua a seção de avaliações (após o preview do arquivo) por este código:
+
+```tsx
+{/* Evaluations - Tabs for Consolidated vs Individual */}
+<div>
+  <div className="flex gap-4 mb-4 border-b">
+    <button
+      onClick={() => setShowIndividualEvaluations(false)}
+      className={`px-4 py-2 font-medium transition-colors ${
+        !showIndividualEvaluations
+          ? "text-blue-600 border-b-2 border-blue-600"
+          : "text-gray-600 hover:text-gray-900"
+      }`}
+    >
+      📊 Análise Consolidada
+    </button>
+    <button
+      onClick={() => setShowIndividualEvaluations(true)}
+      className={`px-4 py-2 font-medium transition-colors ${
+        showIndividualEvaluations
+          ? "text-blue-600 border-b-2 border-blue-600"
+          : "text-gray-600 hover:text-gray-900"
+      }`}
+    >
+      👥 Avaliações Individuais ({taskDetails.evaluations?.length || 0})
+    </button>
+  </div>
+
+  {taskDetails.evaluations && taskDetails.evaluations.length > 0 ? (
+    <>
+      {/* Consolidated View */}
+      {!showIndividualEvaluations && (
+        <div className="space-y-6">
+          {getAllUniqueQuestions().map((question, idx) => {
+            const stats = calculateQuestionStats(question.question_id, question.question_type);
+            const isExpanded = expandedQuestions.has(question.question_id);
+            
+            return (
+              <div key={question.question_id} className="border rounded-lg p-4">
+                <div className="font-medium mb-3">
+                  {idx + 1}. {question.question_text}
+                  <span className="ml-2 text-xs text-gray-500">
+                    ({question.question_type === "boolean" ? "Booleano" : 
+                      question.question_type === "select" ? "Múltipla escolha" : 
+                      "Texto aberto"})
+                  </span>
+                </div>
+
+                {/* Boolean - Bar Chart */}
+                {question.question_type === "boolean" && stats && (
+                  <div className="space-y-3">
+                    <div>
+                      <div className="flex justify-between text-sm mb-1">
+                        <span className="text-green-600 font-medium">✓ Sim</span>
+                        <span className="text-green-600">{stats.true.count} ({stats.true.percentage.toFixed(1)}%)</span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-6">
+                        <div className="bg-green-500 h-6 rounded-full flex items-center justify-end pr-2 text-white text-xs font-medium" style={{ width: `${stats.true.percentage}%` }}>
+                          {stats.true.percentage > 10 && `${stats.true.percentage.toFixed(0)}%`}
+                        </div>
+                      </div>
+                    </div>
+                    <div>
+                      <div className="flex justify-between text-sm mb-1">
+                        <span className="text-red-600 font-medium">✗ Não</span>
+                        <span className="text-red-600">{stats.false.count} ({stats.false.percentage.toFixed(1)}%)</span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-6">
+                        <div className="bg-red-500 h-6 rounded-full flex items-center justify-end pr-2 text-white text-xs font-medium" style={{ width: `${stats.false.percentage}%` }}>
+                          {stats.false.percentage > 10 && `${stats.false.percentage.toFixed(0)}%`}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Select - Bar Chart */}
+                {question.question_type === "select" && Array.isArray(stats) && (
+                  <div className="space-y-3">
+                    {stats.map((option, optIdx) => (
+                      <div key={optIdx}>
+                        <div className="flex justify-between text-sm mb-1">
+                          <span className="font-medium">{option.value}</span>
+                          <span className="text-gray-600">{option.count} ({option.percentage.toFixed(1)}%)</span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-6">
+                          <div className="bg-blue-500 h-6 rounded-full flex items-center justify-end pr-2 text-white text-xs font-medium" style={{ width: `${option.percentage}%` }}>
+                            {option.percentage > 10 && `${option.percentage.toFixed(0)}%`}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Text - Expandable */}
+                {question.question_type === "input_string" && Array.isArray(stats) && (
+                  <div>
+                    <button onClick={() => toggleExpandQuestion(question.question_id)} className="w-full text-left px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded flex items-center justify-between">
+                      <span className="font-medium">{stats.length} resposta{stats.length !== 1 && 's'}</span>
+                      <span className="text-xl">{isExpanded ? "−" : "+"}</span>
+                    </button>
+                    {isExpanded && (
+                      <div className="mt-3 space-y-2">
+                        {stats.map((item: any, itemIdx: number) => (
+                          <div key={itemIdx} className="bg-gray-50 rounded p-3 border-l-4 border-blue-500">
+                            <div className="text-sm text-gray-700 mb-2">{item.answer}</div>
+                            <div className="text-xs text-gray-500">{item.user_name || item.user_email} • {formatDate(item.evaluated_at)}</div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Individual Evaluations */}
+      {showIndividualEvaluations && (
+        <div className="space-y-4">
+          {taskDetails.evaluations.map((evaluation, idx) => (
+            <div key={idx} className="border rounded-lg p-4">
+              <div className="flex items-center justify-between mb-3 pb-3 border-b">
+                <div>
+                  <div className="font-medium text-lg">{evaluation.user_name || evaluation.user_email}</div>
+                  <div className="text-xs text-gray-500">{formatDate(evaluation.evaluated_at)}</div>
+                </div>
+                <div className="text-sm text-gray-500">Avaliação #{idx + 1}</div>
+              </div>
+              {evaluation.answers && evaluation.answers.length > 0 && (
+                <div className="space-y-3">
+                  {evaluation.answers.map((answer, answerIdx) => (
+                    <div key={answerIdx} className="bg-gray-50 rounded p-3">
+                      <div className="text-sm font-medium mb-2">{answer.question_text}</div>
+                      <div className="text-sm text-gray-700">
+                        {answer.question_type === "boolean" ? (
+                          <span className={answer.answer === "true" ? "text-green-600 font-medium" : "text-red-600 font-medium"}>
+                            {answer.answer === "true" ? "✓ Sim" : "✗ Não"}
+                          </span>
+                        ) : answer.answer}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </>
+  ) : (
+    <div className="text-center text-gray-500 py-4">Nenhuma avaliação ainda</div>
+  )}
+</div>
+```
+
+Instruções:
+1. Localize a seção que exibe as avaliações (deve ter um comentário {/* Evaluations */} ou similar)
+2. Substitua todo o bloco até o próximo {/* Actions */}
+3. Este código adiciona:
+   - Abas para alternar entre visualização consolidada e individual
+   - Estatísticas corretas usando TODAS as avaliações
+   - Visualização individual completa com todas as respostas de cada pessoa

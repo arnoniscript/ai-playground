@@ -21,6 +21,20 @@ export default function TesterDashboard() {
   const fetchPlaygrounds = async () => {
     try {
       const response = await api.get("/playgrounds");
+      console.log("=== PLAYGROUNDS RECEIVED ===");
+      console.log("Total playgrounds:", response.data.data?.length);
+      response.data.data?.forEach((pg: any) => {
+        console.log(`\nPlayground: ${pg.name}`);
+        console.log(`Type: ${pg.type}`);
+        console.log(`Has data_labeling_progress:`, !!pg.data_labeling_progress);
+        if (pg.data_labeling_progress) {
+          console.log("Progress data:", pg.data_labeling_progress);
+        }
+        console.log(`Has counters:`, !!pg.counters);
+        if (pg.counters) {
+          console.log("Counters:", pg.counters);
+        }
+      });
       setPlaygrounds(response.data.data || []);
     } catch (error) {
       console.error("Failed to fetch playgrounds:", error);
@@ -56,16 +70,45 @@ export default function TesterDashboard() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {playgrounds.map((playground) => {
-                const totalEvaluations =
-                  playground.counters?.reduce(
-                    (sum, c) => sum + c.current_count,
-                    0
-                  ) || 0;
-                const evaluationGoal = playground.evaluation_goal || 100;
-                const progressPercentage = Math.min(
-                  100,
-                  Math.round((totalEvaluations / evaluationGoal) * 100)
-                );
+                // Calculate progress based on playground type
+                let totalEvaluations = 0;
+                let evaluationGoal = playground.evaluation_goal || 100;
+
+                if (
+                  playground.type === "data_labeling" &&
+                  playground.data_labeling_progress
+                ) {
+                  // For data labeling, use completed evaluations vs expected evaluations
+                  totalEvaluations =
+                    playground.data_labeling_progress.completed_evaluations;
+                  evaluationGoal =
+                    playground.data_labeling_progress.expected_evaluations ||
+                    evaluationGoal;
+
+                  console.log(
+                    `Data Labeling Progress for ${playground.name}:`,
+                    {
+                      totalEvaluations,
+                      evaluationGoal,
+                      progress: playground.data_labeling_progress,
+                    }
+                  );
+                } else {
+                  // For AB testing and tuning, use model counters
+                  totalEvaluations =
+                    playground.counters?.reduce(
+                      (sum, c) => sum + c.current_count,
+                      0
+                    ) || 0;
+                }
+
+                const progressPercentage =
+                  evaluationGoal > 0
+                    ? Math.min(
+                        100,
+                        Math.round((totalEvaluations / evaluationGoal) * 100)
+                      )
+                    : 0;
 
                 // Check if playground is private
                 const isPrivate =
@@ -83,7 +126,11 @@ export default function TesterDashboard() {
                 return hasAccess ? (
                   <Link
                     key={playground.id}
-                    href={`/playground/${playground.id}`}
+                    href={
+                      playground.type === "data_labeling"
+                        ? `/playground/${playground.id}/data-labeling`
+                        : `/playground/${playground.id}`
+                    }
                     className="block"
                   >
                     <div className="p-6 bg-white rounded-lg shadow transition flex flex-col hover:shadow-lg cursor-pointer h-full">
@@ -140,23 +187,45 @@ export default function TesterDashboard() {
                           <span className="badge badge-blue">
                             {playground.type === "ab_testing"
                               ? "A/B Testing"
+                              : playground.type === "data_labeling"
+                              ? "Rotulação"
                               : "Tuning"}
                           </span>
                           <span className="text-gray-600 font-medium">
-                            {totalEvaluations} de {evaluationGoal} avaliações
+                            {playground.type === "data_labeling" &&
+                            playground.has_returned_tasks ? (
+                              <span className="text-amber-600 font-semibold flex items-center gap-1">
+                                <span className="inline-block w-2 h-2 bg-amber-500 rounded-full animate-pulse"></span>
+                                Últimas tasks
+                              </span>
+                            ) : (
+                              `${totalEvaluations} de ${evaluationGoal} avaliações`
+                            )}
                           </span>
                         </div>
 
                         <div className="space-y-2">
                           <div className="flex items-center justify-between text-xs text-gray-600">
                             <span>Progresso</span>
-                            <span className="font-bold text-blue-600">
+                            <span
+                              className={`font-bold ${
+                                playground.type === "data_labeling" &&
+                                playground.has_returned_tasks
+                                  ? "text-amber-600"
+                                  : "text-blue-600"
+                              }`}
+                            >
                               {progressPercentage}%
                             </span>
                           </div>
                           <div className="w-full bg-gray-200 rounded-full h-2.5 overflow-hidden">
                             <div
-                              className="bg-gradient-to-r from-blue-500 to-blue-600 h-2.5 rounded-full transition-all duration-500 ease-out"
+                              className={`h-2.5 rounded-full transition-all duration-500 ease-out ${
+                                playground.type === "data_labeling" &&
+                                playground.has_returned_tasks
+                                  ? "bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600 animate-pulse"
+                                  : "bg-gradient-to-r from-blue-500 to-blue-600"
+                              }`}
                               style={{ width: `${progressPercentage}%` }}
                             ></div>
                           </div>

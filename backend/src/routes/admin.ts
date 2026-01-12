@@ -39,15 +39,75 @@ router.get('/playgrounds', adminOnly, async (req: Request, res: Response) => {
     // Fetch counters for each playground
     const playgroundsWithCounters = await Promise.all(
       (playgrounds || []).map(async (playground) => {
-        const { data: counters } = await db
-          .from('evaluation_counters')
-          .select('*')
-          .eq('playground_id', playground.id);
+        if (playground.type === 'data_labeling') {
+          console.log(`\n=== [ADMIN] Processing Data Labeling Playground: ${playground.name} ===`);
+          
+          // For data labeling playgrounds, fetch parent task metrics
+          const { data: metrics } = await db
+            .from('parent_tasks')
+            .select('status')
+            .eq('playground_id', playground.id);
 
-        return {
-          ...playground,
-          counters,
-        };
+          const totalTasks = metrics?.length || 0;
+          const consolidatedTasks = metrics?.filter(m => m.status === 'consolidated').length || 0;
+          
+          console.log(`[ADMIN] Total tasks: ${totalTasks}`);
+          console.log(`[ADMIN] Repetitions per task: ${playground.repetitions_per_task}`);
+          
+          // Calculate expected evaluations based on repetitions
+          const expectedEvaluations = totalTasks * (playground.repetitions_per_task || 1);
+          
+          console.log(`[ADMIN] Expected evaluations: ${expectedEvaluations}`);
+          
+          // Count completed evaluations - need to get them through parent_tasks
+          // since evaluations are linked to parent_task_id, not playground_id
+          let completedCount = 0;
+          if (totalTasks > 0) {
+            const { data: parentTasks } = await db
+              .from('parent_tasks')
+              .select('id')
+              .eq('playground_id', playground.id);
+            
+            const parentTaskIds = parentTasks?.map(t => t.id) || [];
+            
+            if (parentTaskIds.length > 0) {
+              const { count: completedEvaluations } = await db
+                .from('parent_task_evaluations')
+                .select('id', { count: 'exact', head: true })
+                .in('parent_task_id', parentTaskIds);
+              
+              completedCount = completedEvaluations ?? 0;
+            }
+          }
+          
+          console.log(`[ADMIN] Completed evaluations: ${completedCount}`);
+
+          const progressData = {
+            total_tasks: totalTasks,
+            consolidated_tasks: consolidatedTasks,
+            expected_evaluations: expectedEvaluations,
+            completed_evaluations: completedCount,
+          };
+          
+          console.log('[ADMIN] Progress data:', progressData);
+
+          return {
+            ...playground,
+            counters: [], // Empty for data_labeling
+            data_labeling_progress: progressData
+          };
+        } else {
+          // For AB testing and tuning, fetch model counters
+          const { data: counters } = await db
+            .from('evaluation_counters')
+            .select('*')
+            .eq('playground_id', playground.id);
+
+          return {
+            ...playground,
+            counters,
+          };
+        }
       })
     );
 
@@ -150,7 +210,7 @@ router.post('/playgrounds', adminOnly, async (req: Request, res: Response) => {
       support_text: payload.support_text,
       created_by: req.user?.id,
       restricted_emails: payload.restricted_emails || null,
-      evaluation_goal: payload.evaluation_goal,
+      evaluation_goal: payload.evaluation_goal || 0,
       linked_course_id: payload.linked_course_id || null,
       course_required: payload.course_required || false,
       is_paid: payload.is_paid || false,
@@ -159,6 +219,8 @@ router.post('/playgrounds', adminOnly, async (req: Request, res: Response) => {
       max_time_per_task: payload.max_time_per_task || null,
       tasks_for_goal: payload.tasks_for_goal || null,
       tools: payload.tools || [],
+      repetitions_per_task: payload.repetitions_per_task || null,
+      auto_calculate_evaluations: payload.auto_calculate_evaluations || false,
     };
     
     console.log('Insert data tools:', insertData.tools);
@@ -176,50 +238,55 @@ router.post('/playgrounds', adminOnly, async (req: Request, res: Response) => {
     
     console.log('Playground created with tools:', playground.tools);
 
-    // Create models
-    const modelInserts = payload.models.map(model => ({
-      playground_id: playgroundId,
-      model_key: model.model_key,
-      model_name: model.model_name,
-      embed_code: model.embed_code,
-      max_evaluations: model.max_evaluations,
-    }));
+    // Only create models and counters for ab_testing and tuning playgrounds
+    if (payload.type !== 'data_labeling' && payload.models && payload.models.length > 0) {
+      // Create models
+      const modelInserts = payload.models.map(model => ({
+        playground_id: playgroundId,
+        model_key: model.model_key,
+        model_name: model.model_name,
+        embed_code: model.embed_code,
+        max_evaluations: model.max_evaluations,
+      }));
 
-    const { error: modelsError } = await db
-      .from('model_configurations')
-      .insert(modelInserts);
+      const { error: modelsError } = await db
+        .from('model_configurations')
+        .insert(modelInserts);
 
-    if (modelsError) throw modelsError;
+      if (modelsError) throw modelsError;
 
-    // Create evaluation counters for each model
-    const counterInserts = payload.models.map(model => ({
-      playground_id: playgroundId,
-      model_key: model.model_key,
-      current_count: 0,
-    }));
+      // Create evaluation counters for each model
+      const counterInserts = payload.models.map(model => ({
+        playground_id: playgroundId,
+        model_key: model.model_key,
+        current_count: 0,
+      }));
 
-    const { error: countersError } = await db
-      .from('evaluation_counters')
-      .insert(counterInserts);
+      const { error: countersError } = await db
+        .from('evaluation_counters')
+        .insert(counterInserts);
 
-    if (countersError) throw countersError;
+      if (countersError) throw countersError;
+    }
 
-    // Create questions
-    const questionInserts = payload.questions.map(q => ({
-      playground_id: playgroundId,
-      model_key: q.model_key || null,
-      question_text: q.question_text,
-      question_type: q.question_type,
-      options: q.question_type === 'select' ? q.options : null,
-      order_index: q.order_index,
-      required: q.required,
-    }));
+    // Create questions (only if there are questions to create)
+    if (payload.questions && payload.questions.length > 0) {
+      const questionInserts = payload.questions.map(q => ({
+        playground_id: playgroundId,
+        model_key: q.model_key || null,
+        question_text: q.question_text,
+        question_type: q.question_type,
+        options: q.question_type === 'select' ? q.options : null,
+        order_index: q.order_index,
+        required: q.required,
+      }));
 
-    const { error: questionsError } = await db
-      .from('questions')
-      .insert(questionInserts);
+      const { error: questionsError } = await db
+        .from('questions')
+        .insert(questionInserts);
 
-    if (questionsError) throw questionsError;
+      if (questionsError) throw questionsError;
+    }
 
     res.status(201).json({
       data: playground,

@@ -11,6 +11,7 @@ import coursesMetricsRoutes from './routes/courses-metrics.js';
 import notificationsRoutes from './routes/notifications.js';
 import earningsRoutes from './routes/earnings.js';
 import bankAccountsRoutes from './routes/bank-accounts.js';
+import dataLabelingRoutes from './routes/data-labeling.js';
 
 // Validate environment
 validateConfig();
@@ -35,6 +36,7 @@ app.use('/admin/courses', coursesMetricsRoutes);
 app.use('/notifications', notificationsRoutes);
 app.use('/earnings', earningsRoutes);
 app.use('/bank-accounts', bankAccountsRoutes);
+app.use('/data-labeling', dataLabelingRoutes);
 
 // Root endpoint
 app.get('/', (req, res) => {

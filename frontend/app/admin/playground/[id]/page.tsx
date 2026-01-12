@@ -204,12 +204,38 @@ export default function EditPlaygroundPage() {
         <div className="max-w-4xl mx-auto p-6">
           <div className="flex items-center justify-between mb-6">
             <h1 className="text-3xl font-bold">Editar Playground</h1>
-            <button
-              onClick={() => router.push("/admin")}
-              className="px-4 py-2 border rounded hover:bg-gray-50"
-            >
-              Voltar
-            </button>
+            <div className="flex gap-2">
+              {playground?.type === "data_labeling" && (
+                <>
+                  <button
+                    onClick={() =>
+                      router.push(
+                        `/admin/playground/${playgroundId}/data-labeling-metrics`
+                      )
+                    }
+                    className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                  >
+                    📊 Métricas
+                  </button>
+                  <button
+                    onClick={() =>
+                      router.push(
+                        `/admin/playground/${playgroundId}/consolidation`
+                      )
+                    }
+                    className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700"
+                  >
+                    📋 Consolidar Tasks
+                  </button>
+                </>
+              )}
+              <button
+                onClick={() => router.push("/admin")}
+                className="px-4 py-2 border rounded hover:bg-gray-50"
+              >
+                Voltar
+              </button>
+            </div>
           </div>
 
           {error && (

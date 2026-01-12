@@ -9,8 +9,8 @@ import api from "@/lib/api";
 // Force dynamic rendering
 export const dynamic = "force-dynamic";
 
-type PlaygroundType = "ab_testing" | "tuning";
-type QuestionType = "select" | "input_string";
+type PlaygroundType = "ab_testing" | "tuning" | "data_labeling";
+type QuestionType = "select" | "input_string" | "boolean";
 
 interface ModelInput {
   key: string;
@@ -80,6 +80,14 @@ function CreatePlaygroundForm() {
   const [randomSelectorItems, setRandomSelectorItems] = useState<string[]>([
     "",
   ]);
+
+  // Data Labeling specific states
+  const [zipFile, setZipFile] = useState<File | null>(null);
+  const [repetitionsPerTask, setRepetitionsPerTask] = useState<number>(1);
+  const [autoCalculateEvaluations, setAutoCalculateEvaluations] =
+    useState<boolean>(true);
+  const [isUploadingZip, setIsUploadingZip] = useState<boolean>(false);
+  const [uploadedTasksCount, setUploadedTasksCount] = useState<number>(0);
 
   // Models
   const [models, setModels] = useState<ModelInput[]>([
@@ -277,9 +285,24 @@ function CreatePlaygroundForm() {
       return;
     }
 
-    if (models.some((m) => !m.key.trim() || !m.embedCode.trim())) {
+    if (
+      type !== "data_labeling" &&
+      models.some((m) => !m.key.trim() || !m.embedCode.trim())
+    ) {
       setError("Todos os modelos precisam de chave e código embed");
       return;
+    }
+
+    // Data labeling specific validation
+    if (type === "data_labeling") {
+      if (!zipFile && uploadedTasksCount === 0) {
+        setError("É necessário fazer upload de um arquivo ZIP com as tasks");
+        return;
+      }
+      if (repetitionsPerTask < 1) {
+        setError("Número de repetições por task deve ser pelo menos 1");
+        return;
+      }
     }
 
     if (questions.some((q) => !q.text.trim())) {
@@ -362,7 +385,10 @@ function CreatePlaygroundForm() {
         type,
         description: description || undefined,
         support_text: supportText || undefined,
-        evaluation_goal: evaluationGoal,
+        evaluation_goal:
+          autoCalculateEvaluations && type === "data_labeling"
+            ? 0
+            : evaluationGoal,
         linked_course_id: linkedCourseId || null,
         course_required: courseRequired,
         restricted_emails: isPrivate ? selectedEmails : null,
@@ -373,13 +399,21 @@ function CreatePlaygroundForm() {
           isPaid && paymentType === "per_hour" ? maxTimePerTask : null,
         tasks_for_goal:
           isPaid && paymentType === "per_goal" ? tasksForGoal : null,
+        // Data labeling specific fields
+        repetitions_per_task:
+          type === "data_labeling" ? repetitionsPerTask : null,
+        auto_calculate_evaluations:
+          type === "data_labeling" ? autoCalculateEvaluations : false,
         tools,
-        models: models.map((m) => ({
-          model_key: m.key,
-          model_name: m.key, // Using key as name for now
-          embed_code: m.embedCode,
-          max_evaluations: 1000, // Default value
-        })),
+        models:
+          type !== "data_labeling"
+            ? models.map((m) => ({
+                model_key: m.key,
+                model_name: m.key, // Using key as name for now
+                embed_code: m.embedCode,
+                max_evaluations: 1000, // Default value
+              }))
+            : [],
         questions: questions.map((q, index) => ({
           question_text: q.text,
           question_type: q.type,
@@ -398,6 +432,38 @@ function CreatePlaygroundForm() {
       });
 
       const playgroundId = playgroundResponse.data.data.id;
+
+      // Upload ZIP file if data_labeling type and file is selected
+      if (type === "data_labeling" && zipFile) {
+        setIsUploadingZip(true);
+        try {
+          const formData = new FormData();
+          formData.append("zipFile", zipFile);
+
+          const uploadResponse = await api.post(
+            `/data-labeling/upload-zip/${playgroundId}`,
+            formData,
+            {
+              headers: {
+                "Content-Type": "multipart/form-data",
+              },
+            }
+          );
+
+          setUploadedTasksCount(uploadResponse.data.parent_tasks?.length || 0);
+        } catch (uploadError: any) {
+          console.error("Error uploading ZIP:", uploadError);
+          setError(
+            `Playground criado, mas erro ao fazer upload do ZIP: ${
+              uploadError.response?.data?.error || uploadError.message
+            }`
+          );
+          setIsUploadingZip(false);
+          setIsSubmitting(false);
+          return;
+        }
+        setIsUploadingZip(false);
+      }
 
       // Authorize selected clients (independent of private/public status)
       if (authorizedClientIds.length > 0) {
@@ -468,11 +534,14 @@ function CreatePlaygroundForm() {
                   >
                     <option value="ab_testing">Teste A/B</option>
                     <option value="tuning">Ajuste (Tuning)</option>
+                    <option value="data_labeling">Rotulação de Dados</option>
                   </select>
                   <p className="text-xs text-gray-500 mt-1">
                     {type === "ab_testing"
                       ? "Usuários avaliam 2 modelos e escolhem o melhor"
-                      : "Usuários avaliam 1 modelo múltiplas vezes"}
+                      : type === "tuning"
+                      ? "Usuários avaliam 1 modelo múltiplas vezes"
+                      : "Usuários rotulam arquivos (imagens, PDFs, textos) com perguntas personalizadas"}
                   </p>
                 </div>
 
@@ -1106,74 +1175,224 @@ function CreatePlaygroundForm() {
               </div>
             </section>
 
-            {/* Models */}
-            <section className="bg-white border rounded-lg p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-semibold">
-                  Modelos {type === "ab_testing" ? "(mínimo 2)" : ""}
+            {/* Data Labeling Configuration */}
+            {type === "data_labeling" && (
+              <section className="bg-white border rounded-lg p-6">
+                <h2 className="text-xl font-semibold mb-4">
+                  📂 Configuração de Rotulação de Dados
                 </h2>
-                <button
-                  type="button"
-                  onClick={addModel}
-                  className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
-                >
-                  + Adicionar Modelo
-                </button>
-              </div>
 
-              <div className="space-y-4">
-                {models.map((model, index) => (
-                  <div key={index} className="border rounded p-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <h3 className="font-medium">Modelo {index + 1}</h3>
-                      {models.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => removeModel(index)}
-                          className="text-red-500 hover:text-red-700 text-sm"
-                        >
-                          Remover
-                        </button>
-                      )}
-                    </div>
+                <div className="space-y-6">
+                  {/* ZIP Upload */}
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <h3 className="font-medium text-blue-900 mb-2">
+                      Upload de Arquivos (ZIP)
+                    </h3>
+                    <p className="text-sm text-blue-700 mb-4">
+                      Faça upload de um arquivo ZIP contendo imagens (.jpg,
+                      .png, .gif), PDFs (.pdf) ou arquivos de texto (.txt). Cada
+                      arquivo se tornará uma task principal.
+                    </p>
 
                     <div className="space-y-3">
-                      <div>
-                        <label className="block text-sm font-medium mb-1">
-                          Chave do Modelo *
-                        </label>
-                        <input
-                          type="text"
-                          value={model.key}
-                          onChange={(e) =>
-                            updateModel(index, "key", e.target.value)
+                      <input
+                        type="file"
+                        accept=".zip"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            if (file.size > 100 * 1024 * 1024) {
+                              alert("Arquivo ZIP deve ter no máximo 100MB");
+                              e.target.value = "";
+                              return;
+                            }
+                            setZipFile(file);
                           }
-                          className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          placeholder="ex: model_a, gpt_4, etc"
-                          required
-                        />
-                      </div>
+                        }}
+                        className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
 
-                      <div>
-                        <label className="block text-sm font-medium mb-1">
-                          Código Embed Eleven Labs *
-                        </label>
-                        <textarea
-                          value={model.embedCode}
-                          onChange={(e) =>
-                            updateModel(index, "embedCode", e.target.value)
-                          }
-                          className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
-                          rows={4}
-                          placeholder='<elevenlabs-convai agent-id="..."></elevenlabs-convai>'
-                          required
-                        />
-                      </div>
+                      {zipFile && (
+                        <div className="bg-white border border-green-300 rounded p-3 flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="text-green-600">✓</span>
+                            <span className="text-sm font-medium">
+                              {zipFile.name}
+                            </span>
+                            <span className="text-xs text-gray-500">
+                              ({(zipFile.size / 1024 / 1024).toFixed(2)} MB)
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setZipFile(null)}
+                            className="text-red-500 hover:text-red-700 text-sm"
+                          >
+                            Remover
+                          </button>
+                        </div>
+                      )}
+
+                      {uploadedTasksCount > 0 && (
+                        <div className="bg-green-50 border border-green-300 rounded p-3">
+                          <p className="text-sm text-green-800">
+                            ✓ {uploadedTasksCount} task(s) principais carregadas
+                            com sucesso!
+                          </p>
+                        </div>
+                      )}
                     </div>
                   </div>
-                ))}
-              </div>
-            </section>
+
+                  {/* Repetitions Configuration */}
+                  <div>
+                    <label className="block text-sm font-medium mb-1">
+                      Repetições por Task *
+                    </label>
+                    <input
+                      type="number"
+                      value={repetitionsPerTask}
+                      onChange={(e) =>
+                        setRepetitionsPerTask(parseInt(e.target.value) || 1)
+                      }
+                      className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      min="1"
+                      max="100"
+                      required
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Quantas vezes cada task principal será avaliada por
+                      diferentes usuários (mesmo usuário não pode avaliar a
+                      mesma task duas vezes)
+                    </p>
+                  </div>
+
+                  {/* Auto Calculate Evaluations */}
+                  <div className="flex items-start gap-3">
+                    <input
+                      type="checkbox"
+                      id="autoCalculateEval"
+                      checked={autoCalculateEvaluations}
+                      onChange={(e) =>
+                        setAutoCalculateEvaluations(e.target.checked)
+                      }
+                      className="mt-1"
+                    />
+                    <div>
+                      <label
+                        htmlFor="autoCalculateEval"
+                        className="text-sm font-medium cursor-pointer"
+                      >
+                        Calcular meta de avaliações automaticamente
+                      </label>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Se marcado, a meta será: (número de tasks) × (repetições
+                        por task)
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Manual Evaluation Goal (if auto calculate is off) */}
+                  {!autoCalculateEvaluations && (
+                    <div>
+                      <label className="block text-sm font-medium mb-1">
+                        Meta de Avaliações *
+                      </label>
+                      <input
+                        type="number"
+                        value={evaluationGoal}
+                        onChange={(e) =>
+                          setEvaluationGoal(parseInt(e.target.value) || 0)
+                        }
+                        className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        min="1"
+                        required
+                      />
+                    </div>
+                  )}
+
+                  <div className="bg-yellow-50 border border-yellow-200 rounded p-3">
+                    <p className="text-sm text-yellow-800">
+                      💡 <strong>Dica:</strong> Após criar o playground, você
+                      poderá acessar o painel de consolidação para revisar as
+                      respostas e decidir se consolida cada task ou retorna para
+                      avaliação adicional.
+                    </p>
+                  </div>
+                </div>
+              </section>
+            )}
+
+            {/* Models */}
+            {type !== "data_labeling" && (
+              <section className="bg-white border rounded-lg p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-xl font-semibold">
+                    Modelos {type === "ab_testing" ? "(mínimo 2)" : ""}
+                  </h2>
+                  <button
+                    type="button"
+                    onClick={addModel}
+                    className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
+                  >
+                    + Adicionar Modelo
+                  </button>
+                </div>
+
+                <div className="space-y-4">
+                  {models.map((model, index) => (
+                    <div key={index} className="border rounded p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <h3 className="font-medium">Modelo {index + 1}</h3>
+                        {models.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => removeModel(index)}
+                            className="text-red-500 hover:text-red-700 text-sm"
+                          >
+                            Remover
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="space-y-3">
+                        <div>
+                          <label className="block text-sm font-medium mb-1">
+                            Chave do Modelo *
+                          </label>
+                          <input
+                            type="text"
+                            value={model.key}
+                            onChange={(e) =>
+                              updateModel(index, "key", e.target.value)
+                            }
+                            className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            placeholder="ex: model_a, gpt_4, etc"
+                            required
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium mb-1">
+                            Código Embed Eleven Labs *
+                          </label>
+                          <textarea
+                            value={model.embedCode}
+                            onChange={(e) =>
+                              updateModel(index, "embedCode", e.target.value)
+                            }
+                            className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+                            rows={4}
+                            placeholder='<elevenlabs-convai agent-id="..."></elevenlabs-convai>'
+                            required
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
 
             {/* Questions */}
             <section className="bg-white border rounded-lg p-6">
@@ -1258,7 +1477,12 @@ function CreatePlaygroundForm() {
                           >
                             <option value="select">Múltipla Escolha</option>
                             <option value="input_string">Texto Aberto</option>
+                            <option value="boolean">Sim/Não (Checkbox)</option>
                           </select>
+                          <p className="text-xs text-gray-500 mt-1">
+                            {question.type === "boolean" &&
+                              "Pergunta booleana com checkbox true/false"}
+                          </p>
                         </div>
 
                         <div>
