@@ -800,8 +800,12 @@ export function RegisterQAModal({ isOpen, onClose }: RegisterQAModalProps) {
               {/* Logo - Aligned Left */}
               <div className="mb-8">
                 <div className="flex items-center gap-3">
-                  <div className="bg-gradient-to-br from-blue-600 to-purple-600 w-16 h-16 rounded-2xl flex items-center justify-center shadow-lg">
-                    <span className="text-white font-bold text-2xl">AI</span>
+                  <div className="bg-gradient-to-br from-blue-600 to-purple-600 w-16 h-16 rounded-2xl flex items-center justify-center shadow-lg overflow-hidden">
+                    <img
+                      src="/assets/MarisaAI.png"
+                      alt="AI Marisa logo"
+                      className="w-full h-full object-cover"
+                    />
                   </div>
                   <div className="text-left">
                     <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
@@ -861,8 +865,12 @@ export function RegisterQAModal({ isOpen, onClose }: RegisterQAModalProps) {
               {/* Header */}
               <div className="mb-6">
                 <div className="flex items-center gap-3 mb-4">
-                  <div className="bg-gradient-to-br from-blue-600 to-purple-600 w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg">
-                    <span className="text-white font-bold text-xl">AI</span>
+                  <div className="bg-gradient-to-br from-blue-600 to-purple-600 w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg overflow-hidden">
+                    <img
+                      src="/assets/MarisaAI.png"
+                      alt="AI Marisa logo"
+                      className="w-full h-full object-cover"
+                    />
                   </div>
                   <div>
                     <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">

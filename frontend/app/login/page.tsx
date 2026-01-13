@@ -24,8 +24,12 @@ export default function LoginPage() {
         <div className="text-center lg:text-left space-y-8">
           {/* Logo */}
           <div className="flex items-center justify-center lg:justify-start gap-3">
-            <div className="bg-gradient-to-br from-blue-600 to-purple-600 w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg">
-              <span className="text-white font-bold text-2xl">AI</span>
+            <div className="bg-gradient-to-br from-blue-600 to-purple-600 w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg overflow-hidden">
+              <img
+                src="/assets/MarisaAI.png"
+                alt="AI Marisa logo"
+                className="w-full h-full object-cover"
+              />
             </div>
             <div>
               <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
