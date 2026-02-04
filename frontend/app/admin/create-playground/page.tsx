@@ -82,7 +82,7 @@ function CreatePlaygroundForm() {
   ]);
 
   // Data Labeling specific states
-  const [zipFile, setZipFile] = useState<File | null>(null);
+  const [zipFiles, setZipFiles] = useState<File[]>([]);
   const [repetitionsPerTask, setRepetitionsPerTask] = useState<number>(1);
   const [autoCalculateEvaluations, setAutoCalculateEvaluations] =
     useState<boolean>(true);
@@ -149,7 +149,7 @@ function CreatePlaygroundForm() {
               playgroundData.models.map((m: any) => ({
                 key: m.model_key,
                 embedCode: m.embed_code,
-              }))
+              })),
             );
           }
 
@@ -165,7 +165,7 @@ function CreatePlaygroundForm() {
                   q.question_type === "select" && q.options
                     ? q.options.map((opt: any) => opt.label)
                     : [""],
-              }))
+              })),
             );
           }
 
@@ -185,7 +185,7 @@ function CreatePlaygroundForm() {
   const updateModel = (
     index: number,
     field: keyof ModelInput,
-    value: string
+    value: string,
   ) => {
     const updated = [...models];
     updated[index][field] = value;
@@ -214,7 +214,7 @@ function CreatePlaygroundForm() {
   const updateQuestion = (
     index: number,
     field: keyof QuestionInput,
-    value: any
+    value: any,
   ) => {
     const updated = [...questions];
     (updated[index] as any)[field] = value;
@@ -239,7 +239,7 @@ function CreatePlaygroundForm() {
   const updateOption = (
     questionIndex: number,
     optionIndex: number,
-    value: string
+    value: string,
   ) => {
     const updated = [...questions];
     updated[questionIndex].options![optionIndex] = value;
@@ -295,8 +295,10 @@ function CreatePlaygroundForm() {
 
     // Data labeling specific validation
     if (type === "data_labeling") {
-      if (!zipFile && uploadedTasksCount === 0) {
-        setError("É necessário fazer upload de um arquivo ZIP com as tasks");
+      if (zipFiles.length === 0 && uploadedTasksCount === 0) {
+        setError(
+          "É necessário fazer upload de pelo menos um arquivo ZIP com as tasks",
+        );
         return;
       }
       if (repetitionsPerTask < 1) {
@@ -316,7 +318,7 @@ function CreatePlaygroundForm() {
           q.type === "select" &&
           (!q.options ||
             q.options.length === 0 ||
-            q.options.some((o) => !o.trim()))
+            q.options.some((o) => !o.trim())),
       )
     ) {
       setError("Perguntas de seleção precisam de pelo menos uma opção válida");
@@ -338,7 +340,7 @@ function CreatePlaygroundForm() {
       }
       if (paymentType === "per_goal" && (!tasksForGoal || tasksForGoal <= 0)) {
         setError(
-          "Número de tasks para meta é obrigatório para pagamento por meta"
+          "Número de tasks para meta é obrigatório para pagamento por meta",
         );
         return;
       }
@@ -373,7 +375,7 @@ function CreatePlaygroundForm() {
       console.log("Tools array being sent:", tools);
       console.log(
         "enableBrazilianPersonGenerator:",
-        enableBrazilianPersonGenerator
+        enableBrazilianPersonGenerator,
       );
       console.log("enableRandomSelector:", enableRandomSelector);
       console.log("randomSelectorTitle:", randomSelectorTitle);
@@ -434,11 +436,14 @@ function CreatePlaygroundForm() {
       const playgroundId = playgroundResponse.data.data.id;
 
       // Upload ZIP file if data_labeling type and file is selected
-      if (type === "data_labeling" && zipFile) {
+      if (type === "data_labeling" && zipFiles.length > 0) {
         setIsUploadingZip(true);
         try {
           const formData = new FormData();
-          formData.append("zipFile", zipFile);
+          // Add all ZIP files
+          zipFiles.forEach((file) => {
+            formData.append("zipFiles", file);
+          });
 
           const uploadResponse = await api.post(
             `/data-labeling/upload-zip/${playgroundId}`,
@@ -447,16 +452,16 @@ function CreatePlaygroundForm() {
               headers: {
                 "Content-Type": "multipart/form-data",
               },
-            }
+            },
           );
 
-          setUploadedTasksCount(uploadResponse.data.parent_tasks?.length || 0);
+          setUploadedTasksCount(uploadResponse.data.parent_tasks_count || 0);
         } catch (uploadError: any) {
           console.error("Error uploading ZIP:", uploadError);
           setError(
             `Playground criado, mas erro ao fazer upload do ZIP: ${
               uploadError.response?.data?.error || uploadError.message
-            }`
+            }`,
           );
           setIsUploadingZip(false);
           setIsSubmitting(false);
@@ -473,8 +478,8 @@ function CreatePlaygroundForm() {
               api.post(`/admin/playgrounds/${playgroundId}/authorized-users`, {
                 user_id: userId,
                 notes: "Autorizado durante criação do playground",
-              })
-            )
+              }),
+            ),
           );
         } catch (authError) {
           console.error("Error authorizing clients:", authError);
@@ -540,8 +545,8 @@ function CreatePlaygroundForm() {
                     {type === "ab_testing"
                       ? "Usuários avaliam 2 modelos e escolhem o melhor"
                       : type === "tuning"
-                      ? "Usuários avaliam 1 modelo múltiplas vezes"
-                      : "Usuários rotulam arquivos (imagens, PDFs, textos) com perguntas personalizadas"}
+                        ? "Usuários avaliam 1 modelo múltiplas vezes"
+                        : "Usuários rotulam arquivos (imagens, PDFs, textos) com perguntas personalizadas"}
                   </p>
                 </div>
 
@@ -694,7 +699,7 @@ function CreatePlaygroundForm() {
                             e.target.value as
                               | "per_hour"
                               | "per_task"
-                              | "per_goal"
+                              | "per_goal",
                           )
                         }
                         className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -935,8 +940,8 @@ function CreatePlaygroundForm() {
                                   onClick={() => {
                                     setRandomSelectorItems(
                                       randomSelectorItems.filter(
-                                        (_, i) => i !== index
-                                      )
+                                        (_, i) => i !== index,
+                                      ),
                                     );
                                   }}
                                   className="px-3 py-2 text-red-600 hover:bg-red-50 rounded"
@@ -1050,8 +1055,8 @@ function CreatePlaygroundForm() {
                                 } else {
                                   setSelectedEmails(
                                     selectedEmails.filter(
-                                      (email) => email !== user.email
-                                    )
+                                      (email) => email !== user.email,
+                                    ),
                                   );
                                 }
                               }}
@@ -1137,8 +1142,8 @@ function CreatePlaygroundForm() {
                                 } else {
                                   setAuthorizedClientIds(
                                     authorizedClientIds.filter(
-                                      (id) => id !== client.id
-                                    )
+                                      (id) => id !== client.id,
+                                    ),
                                   );
                                 }
                               }}
@@ -1189,47 +1194,97 @@ function CreatePlaygroundForm() {
                       Upload de Arquivos (ZIP)
                     </h3>
                     <p className="text-sm text-blue-700 mb-4">
-                      Faça upload de um arquivo ZIP contendo imagens (.jpg,
-                      .png, .gif), PDFs (.pdf) ou arquivos de texto (.txt). Cada
+                      Faça upload de arquivos ZIP contendo imagens (.jpg, .png,
+                      .gif), PDFs (.pdf) ou arquivos de texto (.txt). Cada
                       arquivo se tornará uma task principal.
+                      <br />
+                      <span className="font-medium">
+                        Limites: Máx. 50MB por arquivo • Máx. 500MB no total
+                      </span>
                     </p>
 
                     <div className="space-y-3">
                       <input
                         type="file"
                         accept=".zip"
+                        multiple
                         onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) {
-                            if (file.size > 100 * 1024 * 1024) {
-                              alert("Arquivo ZIP deve ter no máximo 100MB");
-                              e.target.value = "";
-                              return;
-                            }
-                            setZipFile(file);
+                          const files = Array.from(e.target.files || []);
+                          if (files.length === 0) return;
+
+                          // Validate individual file size (50MB max)
+                          const invalidFiles = files.filter(
+                            (f) => f.size > 50 * 1024 * 1024,
+                          );
+                          if (invalidFiles.length > 0) {
+                            alert(
+                              `Os seguintes arquivos excedem 50MB:\n${invalidFiles.map((f) => f.name).join("\n")}`,
+                            );
+                            e.target.value = "";
+                            return;
                           }
+
+                          // Validate total size (500MB max)
+                          const totalSize = files.reduce(
+                            (sum, f) => sum + f.size,
+                            0,
+                          );
+                          if (totalSize > 500 * 1024 * 1024) {
+                            alert(
+                              `Tamanho total dos arquivos (${(totalSize / 1024 / 1024).toFixed(2)}MB) excede o limite de 500MB`,
+                            );
+                            e.target.value = "";
+                            return;
+                          }
+
+                          setZipFiles(files);
                         }}
                         className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
 
-                      {zipFile && (
-                        <div className="bg-white border border-green-300 rounded p-3 flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <span className="text-green-600">✓</span>
-                            <span className="text-sm font-medium">
-                              {zipFile.name}
+                      {zipFiles.length > 0 && (
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between text-sm font-medium">
+                            <span>
+                              {zipFiles.length} arquivo(s) selecionado(s)
                             </span>
-                            <span className="text-xs text-gray-500">
-                              ({(zipFile.size / 1024 / 1024).toFixed(2)} MB)
+                            <span className="text-gray-600">
+                              Total:{" "}
+                              {(
+                                zipFiles.reduce((sum, f) => sum + f.size, 0) /
+                                1024 /
+                                1024
+                              ).toFixed(2)}{" "}
+                              MB
                             </span>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => setZipFile(null)}
-                            className="text-red-500 hover:text-red-700 text-sm"
-                          >
-                            Remover
-                          </button>
+                          {zipFiles.map((file, index) => (
+                            <div
+                              key={index}
+                              className="bg-white border border-green-300 rounded p-3 flex items-center justify-between"
+                            >
+                              <div className="flex items-center gap-2">
+                                <span className="text-green-600">✓</span>
+                                <span className="text-sm font-medium">
+                                  {file.name}
+                                </span>
+                                <span className="text-xs text-gray-500">
+                                  ({(file.size / 1024 / 1024).toFixed(2)} MB)
+                                </span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setZipFiles(
+                                    zipFiles.filter((_, i) => i !== index),
+                                  )
+                                }
+                                className="text-red-500 hover:text-red-700 text-sm"
+                              >
+                                Remover
+                              </button>
+                            </div>
+                          ))}
                         </div>
                       )}
 
@@ -1470,7 +1525,7 @@ function CreatePlaygroundForm() {
                               updateQuestion(
                                 qIndex,
                                 "type",
-                                e.target.value as QuestionType
+                                e.target.value as QuestionType,
                               )
                             }
                             className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -1497,7 +1552,7 @@ function CreatePlaygroundForm() {
                                 updateQuestion(
                                   qIndex,
                                   "required",
-                                  e.target.checked
+                                  e.target.checked,
                                 )
                               }
                               className="mr-2"

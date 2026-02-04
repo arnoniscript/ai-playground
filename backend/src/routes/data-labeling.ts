@@ -16,16 +16,20 @@ import {
 const router = Router();
 
 // Configure multer for memory storage
+// Supports multiple ZIP files: max 50MB per file, 500MB total
 const upload = multer({ 
   storage: multer.memoryStorage(),
-  limits: { fileSize: 100 * 1024 * 1024 } // 100MB limit
+  limits: { 
+    fileSize: 50 * 1024 * 1024, // 50MB per file
+    files: 10 // Max 10 files (allows up to 500MB total)
+  }
 });
 
 // Upload ZIP and create parent tasks
 router.post(
   '/upload-zip/:playgroundId',
   authenticateToken,
-  upload.single('zipFile'),
+  upload.array('zipFiles', 10), // Accept up to 10 files
   asyncHandler(async (req, res) => {
     const { playgroundId } = req.params;
     const userId = req.user!.id;
@@ -35,21 +39,31 @@ router.post(
     console.log('Playground ID:', playgroundId);
     console.log('User ID:', userId);
     console.log('User Role:', userRole);
-    console.log('File received:', req.file ? 'YES' : 'NO');
-    if (req.file) {
-      console.log('File details:', {
-        originalname: req.file.originalname,
-        mimetype: req.file.mimetype,
-        size: req.file.size
-      });
+    
+    const files = req.files as Express.Multer.File[];
+    console.log('Files received:', files ? files.length : 0);
+    
+    if (files && files.length > 0) {
+      const totalSize = files.reduce((sum, f) => sum + f.size, 0);
+      console.log('Files details:', files.map(f => ({
+        name: f.originalname,
+        mimetype: f.mimetype,
+        size: f.size
+      })));
+      console.log('Total size:', totalSize, 'bytes', `(${(totalSize / 1024 / 1024).toFixed(2)} MB)`);
+      
+      // Validate total size (500MB max)
+      if (totalSize > 500 * 1024 * 1024) {
+        return res.status(400).json({ error: 'Total file size exceeds 500MB limit' });
+      }
     }
 
     if (userRole !== 'admin') {
       return res.status(403).json({ error: 'Only admins can upload files' });
     }
 
-    if (!req.file) {
-      return res.status(400).json({ error: 'No file uploaded' });
+    if (!files || files.length === 0) {
+      return res.status(400).json({ error: 'No files uploaded' });
     }
 
     // Validate playground exists and is data_labeling type
@@ -72,14 +86,21 @@ router.post(
     const repetitionsPerTask = playground.repetitions_per_task || 1;
 
     try {
-      // Extract ZIP file
-      const zip = new AdmZip(req.file.buffer);
-      const zipEntries = zip.getEntries();
-
-      console.log('ZIP extracted, total entries:', zipEntries.length);
-
       const validExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.pdf', '.txt'];
       const parentTasks: ParentTask[] = [];
+      
+      console.log('Processing', files.length, 'ZIP file(s)');
+      
+      // Process each ZIP file
+      for (let fileIndex = 0; fileIndex < files.length; fileIndex++) {
+        const zipFile = files[fileIndex];
+        console.log(`\n=== Processing ZIP ${fileIndex + 1}/${files.length}: ${zipFile.originalname} ===`);
+        
+        // Extract ZIP file
+        const zip = new AdmZip(zipFile.buffer);
+        const zipEntries = zip.getEntries();
+
+        console.log('ZIP extracted, total entries:', zipEntries.length);
 
       for (const entry of zipEntries) {
         console.log('Processing entry:', entry.name, 'isDirectory:', entry.isDirectory);
@@ -171,7 +192,10 @@ router.post(
         }
       }
 
+      } // End of ZIP files loop
+      
       console.log('Total parent tasks created:', parentTasks.length);
+      console.log('Files processed:', files.length);
 
       // Update playground evaluation_goal if auto_calculate_evaluations is true
       const { data: pg } = await supabase
@@ -189,7 +213,9 @@ router.post(
       }
 
       res.json({ 
-        message: `Successfully uploaded ${parentTasks.length} files`,
+        message: `Successfully processed ${files.length} ZIP file(s) and uploaded ${parentTasks.length} task(s)`,
+        zip_files_count: files.length,
+        parent_tasks_count: parentTasks.length,
         parent_tasks: parentTasks
       });
     } catch (error) {
