@@ -40,6 +40,8 @@ export interface User {
   created_at: string;
   updated_at?: string;
   last_login?: string | null;
+  slack_connected?: boolean;
+  slack_checked_at?: string | null;
 }
 
 export interface Playground {

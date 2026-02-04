@@ -8,12 +8,14 @@ import api from "@/lib/api";
 import { Playground } from "@/lib/types";
 import Link from "next/link";
 import QADashboardEarnings from "@/components/qa-dashboard-earnings";
+import Image from "next/image";
 
 export default function TesterDashboard() {
-  const { user } = useAuthStore();
+  const { user, setUser } = useAuthStore();
   const [playgrounds, setPlaygrounds] = useState<Playground[]>([]);
   const [loading, setLoading] = useState(true);
   const [pendingUsersCount, setPendingUsersCount] = useState(0);
+  const [slackChecking, setSlackChecking] = useState(false);
 
   useEffect(() => {
     fetchPlaygrounds();
@@ -21,6 +23,33 @@ export default function TesterDashboard() {
       fetchPendingUsers();
     }
   }, [user]);
+
+  const slackWorkspaceUrl = "https://aimarisaplayground.slack.com";
+  const slackLogoSrc = "/assets/slack-new-logo-icon-11609376883z32jbkf8kg.png";
+
+  const refreshSlackStatus = async () => {
+    if (!user) return;
+    try {
+      setSlackChecking(true);
+      const response = await api.post("/users/slack/refresh");
+      const { connected, last_checked_at } = response.data.data || {};
+
+      if (typeof connected === "boolean") {
+        setUser({
+          ...user,
+          slack_connected: connected,
+          slack_checked_at: last_checked_at || null,
+        });
+      }
+    } catch (error) {
+      console.error("Failed to refresh Slack status:", error);
+      alert(
+        "Não pude confirmar que você está no slack, se tiver certeza que entrou, tente novamente em alguns minutos."
+      );
+    } finally {
+      setSlackChecking(false);
+    }
+  };
 
   const fetchPendingUsers = async () => {
     try {
@@ -68,6 +97,78 @@ export default function TesterDashboard() {
               Escolha um playground para começar a avaliar
             </p>
           </div>
+
+          {user &&
+            (user.slack_connected ? (
+              <div className="bg-green-50 border border-green-200 rounded-xl p-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4 shadow-sm">
+                <div className="flex items-center gap-4">
+                  <div className="bg-white border border-green-200 rounded-full w-14 h-14 flex items-center justify-center shadow">
+                    <Image
+                      src={slackLogoSrc}
+                      alt="Logo do Slack"
+                      width={40}
+                      height={40}
+                    />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-green-900">
+                      Conectado ao Slack
+                    </h3>
+                    <p className="text-sm text-green-800/80">
+                      Agora você recebe atualizações em tempo real sobre novos
+                      projetos e oportunidades.
+                    </p>
+                  </div>
+                </div>
+                <a
+                  href={slackWorkspaceUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center justify-center px-5 py-3 bg-green-600 text-white rounded-lg shadow hover:bg-green-700 transition-colors"
+                >
+                  Abrir workspace do Slack
+                </a>
+              </div>
+            ) : (
+              <div className="bg-white border border-blue-200 rounded-xl p-5 flex flex-col gap-4 shadow-sm">
+                <div className="flex items-start gap-4">
+                  <div className="bg-blue-50 border border-blue-200 rounded-2xl w-16 h-16 flex items-center justify-center shadow">
+                    <Image
+                      src={slackLogoSrc}
+                      alt="Logo do Slack"
+                      width={46}
+                      height={46}
+                    />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-semibold text-gray-900">
+                      Entre no Slack para não perder nada
+                    </h3>
+                    <p className="text-sm text-gray-600 mt-1">
+                      Fique por dentro dos novos playgrounds, tire dúvidas com o
+                      time em tempo real e receba oportunidades direcionadas.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                  <a
+                    href={slackWorkspaceUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1 inline-flex items-center justify-center px-5 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg shadow hover:from-blue-700 hover:to-purple-700 transition-colors"
+                  >
+                    Entrar no Slack
+                  </a>
+                  <button
+                    onClick={refreshSlackStatus}
+                    disabled={slackChecking}
+                    className="flex-1 px-5 py-3 border border-blue-200 rounded-lg text-blue-700 font-medium hover:bg-blue-50 disabled:opacity-60"
+                  >
+                    {slackChecking ? "Verificando..." : "Já entrei"}
+                  </button>
+                </div>
+              </div>
+            ))}
 
           {/* Pending Users Notification - Admin Only */}
           {user?.role === "admin" && pendingUsersCount > 0 && (

@@ -475,6 +475,9 @@ export default function UserManagementPage() {
                       Status
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Slack
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Criado em
                     </th>
                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -486,7 +489,7 @@ export default function UserManagementPage() {
                   {filteredUsers.length === 0 ? (
                     <tr>
                       <td
-                        colSpan={5}
+                        colSpan={6}
                         className="px-6 py-12 text-center text-gray-500"
                       >
                         Nenhum usuário encontrado
@@ -510,6 +513,17 @@ export default function UserManagementPage() {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           {getStatusBadge(user.status)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          {user.slack_connected ? (
+                            <span className="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-700">
+                              Conectado
+                            </span>
+                          ) : (
+                            <span className="px-2 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-700">
+                              Pendente
+                            </span>
+                          )}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                           {new Date(user.created_at).toLocaleDateString(

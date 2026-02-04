@@ -2,6 +2,8 @@ import { Router } from "express";
 import { z } from "zod";
 import { supabase } from "../db/client.js";
 import { authenticateToken } from "../middleware/auth.js";
+import { checkSlackMembership, isSlackIntegrationEnabled } from "../utils/slack.js";
+import { config } from "../config.js";
 
 const router = Router();
 
@@ -102,6 +104,67 @@ router.put("/profile", authenticateToken, async (req, res) => {
 
     console.error("Error in PUT /users/profile:", error);
     res.status(500).json({ error: "Erro interno ao atualizar perfil" });
+  }
+});
+
+router.post("/slack/refresh", authenticateToken, async (req, res) => {
+  try {
+    if (!isSlackIntegrationEnabled()) {
+      return res.status(400).json({ error: "Integração com Slack não configurada" });
+    }
+
+    const userId = (req as any).user.id;
+
+    const { data: user, error } = await supabase
+      .from("users")
+      .select("id, email")
+      .eq("id", userId)
+      .single();
+
+    if (error || !user) {
+      return res.status(404).json({ error: "Usuário não encontrado" });
+    }
+
+    if (!user.email) {
+      return res.status(400).json({ error: "Usuário não possui email configurado" });
+    }
+
+    const slackResult = await checkSlackMembership(user.email);
+
+    if (slackResult.error) {
+      return res.status(502).json({
+        error: "Falha ao verificar status no Slack",
+        detail: slackResult.error,
+      });
+    }
+
+    const nowIso = new Date().toISOString();
+
+    const { data: updatedUser, error: updateError } = await supabase
+      .from("users")
+      .update({
+        slack_connected: slackResult.isMember,
+        slack_checked_at: nowIso,
+      })
+      .eq("id", user.id)
+      .select("slack_connected, slack_checked_at")
+      .single();
+
+    if (updateError) {
+      console.error("Error updating Slack status:", updateError);
+      return res.status(500).json({ error: "Erro ao atualizar status do Slack" });
+    }
+
+    res.json({
+      data: {
+        connected: updatedUser?.slack_connected ?? slackResult.isMember,
+        last_checked_at: updatedUser?.slack_checked_at ?? nowIso,
+        workspace_url: config.slack.workspaceUrl,
+      },
+    });
+  } catch (error) {
+    console.error("Error in POST /users/slack/refresh:", error);
+    res.status(500).json({ error: "Erro interno ao verificar Slack" });
   }
 });
 

@@ -5,6 +5,7 @@ import { asyncHandler } from '../utils/asyncHandler.js';
 import { config } from '../config.js';
 import { SignupRequestSchema, VerifyOTPSchema } from '../schemas/index.js';
 import { Resend } from "resend";
+import { checkSlackMembership, isSlackIntegrationEnabled } from '../utils/slack.js';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -191,10 +192,54 @@ router.post('/verify', loginRateLimiter, asyncHandler(async (req: Request, res: 
   }
 
   // Update last login
+  const nowIso = new Date().toISOString();
   await db
     .from('users')
-    .update({ last_login: new Date().toISOString() })
+    .update({ last_login: nowIso })
     .eq('id', user.id);
+
+  // Sync Slack membership on login
+  if (isSlackIntegrationEnabled() && user.email) {
+    try {
+      const slackResult = await checkSlackMembership(user.email);
+
+      if (!slackResult.error) {
+        const shouldUpdate =
+          typeof user.slack_connected === 'undefined' ||
+          user.slack_connected !== slackResult.isMember ||
+          !user.slack_checked_at;
+
+        if (shouldUpdate) {
+          const { data: updatedUser } = await db
+            .from('users')
+            .update({
+              slack_connected: slackResult.isMember,
+              slack_checked_at: nowIso,
+            })
+            .eq('id', user.id)
+            .select('slack_connected, slack_checked_at')
+            .single();
+
+          if (updatedUser) {
+            user.slack_connected = updatedUser.slack_connected;
+            user.slack_checked_at = updatedUser.slack_checked_at;
+          } else {
+            user.slack_connected = slackResult.isMember;
+            user.slack_checked_at = nowIso;
+          }
+        } else {
+          // Update last checked timestamp
+          await db
+            .from('users')
+            .update({ slack_checked_at: nowIso })
+            .eq('id', user.id);
+          user.slack_checked_at = nowIso;
+        }
+      }
+    } catch (error) {
+      console.error('Failed to sync Slack membership for user:', user.email, error);
+    }
+  }
 
   // Generate token
   const token = generateToken(user);
@@ -206,6 +251,8 @@ router.post('/verify', loginRateLimiter, asyncHandler(async (req: Request, res: 
       email: user.email,
       role: user.role,
       full_name: user.full_name,
+      slack_connected: Boolean(user.slack_connected),
+      slack_checked_at: user.slack_checked_at || null,
     },
   });
 }));

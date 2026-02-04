@@ -25,6 +25,10 @@ export const config = {
   frontend: {
     url: process.env.FRONTEND_URL || 'http://localhost:3000',
   },
+  slack: {
+    botToken: process.env.SLACK_BOT_TOKEN || '',
+    workspaceUrl: process.env.SLACK_WORKSPACE_URL || 'https://aimarisaplayground.slack.com',
+  },
 };
 
 export function validateConfig() {
