@@ -156,11 +156,24 @@ export async function convertPdfToWatermarkedImages(
       // Write PDF to temp file
       await fs.writeFile(pdfPath, pdfBuffer);
       
-      // Convert PDF to PNG images using pdftoppm from Homebrew
+      // Try to find pdftoppm in PATH
+      try {
+        const { stdout: whichOutput } = await execAsync('which pdftoppm');
+        console.log('pdftoppm found at:', whichOutput.trim());
+      } catch (e) {
+        console.error('pdftoppm not found in PATH');
+      }
+      
+      // Convert PDF to PNG images using pdftoppm
+      // Uses PATH to find pdftoppm (works on both macOS and Linux)
       // -png: output format
       // -r 150: resolution (DPI)
-      const command = `/opt/homebrew/bin/pdftoppm -png -r 150 "${pdfPath}" "${outputPrefix}"`;
-      await execAsync(command);
+      const command = `pdftoppm -png -r 150 "${pdfPath}" "${outputPrefix}"`;
+      console.log('Executing command:', command);
+      
+      const { stdout, stderr } = await execAsync(command);
+      if (stdout) console.log('pdftoppm stdout:', stdout);
+      if (stderr) console.log('pdftoppm stderr:', stderr);
       
       // Read generated images (pdftoppm creates files like page-1.png, page-2.png, etc.)
       const files = await fs.readdir(tempDir);

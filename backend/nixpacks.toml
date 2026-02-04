@@ -1,0 +1,15 @@
+# Railway/Nixpacks Configuration
+# This file ensures poppler-utils (pdftoppm) is installed in the production environment
+
+[phases.setup]
+# Install poppler-utils for pdftoppm command
+aptPkgs = ["poppler-utils"]
+
+[phases.install]
+cmds = ["npm ci"]
+
+[phases.build]
+cmds = ["npm run build"]
+
+[start]
+cmd = "npm start"
