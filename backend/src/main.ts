@@ -12,6 +12,7 @@ import notificationsRoutes from './routes/notifications.js';
 import earningsRoutes from './routes/earnings.js';
 import bankAccountsRoutes from './routes/bank-accounts.js';
 import dataLabelingRoutes from './routes/data-labeling.js';
+import curationRoutes from './routes/curation.js';
 import usersRoutes from './routes/users.js';
 
 // Validate environment
@@ -38,6 +39,7 @@ app.use('/notifications', notificationsRoutes);
 app.use('/earnings', earningsRoutes);
 app.use('/bank-accounts', bankAccountsRoutes);
 app.use('/data-labeling', dataLabelingRoutes);
+app.use('/curation', curationRoutes);
 app.use('/users', usersRoutes);
 
 // Root endpoint

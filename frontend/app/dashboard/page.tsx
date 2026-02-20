@@ -136,14 +136,21 @@ export default function TesterDashboard() {
                       totalEvaluations,
                       evaluationGoal,
                       progress: playground.data_labeling_progress,
-                    }
+                    },
                   );
+                } else if (
+                  playground.type === "curation" &&
+                  (playground as any).curation_progress
+                ) {
+                  const cp = (playground as any).curation_progress;
+                  totalEvaluations = cp.completed_evaluations || 0;
+                  evaluationGoal = cp.expected_evaluations || evaluationGoal;
                 } else {
                   // For AB testing and tuning, use model counters
                   totalEvaluations =
                     playground.counters?.reduce(
                       (sum, c) => sum + c.current_count,
-                      0
+                      0,
                     ) || 0;
                 }
 
@@ -151,7 +158,7 @@ export default function TesterDashboard() {
                   evaluationGoal > 0
                     ? Math.min(
                         100,
-                        Math.round((totalEvaluations / evaluationGoal) * 100)
+                        Math.round((totalEvaluations / evaluationGoal) * 100),
                       )
                     : 0;
 
@@ -174,7 +181,9 @@ export default function TesterDashboard() {
                     href={
                       playground.type === "data_labeling"
                         ? `/playground/${playground.id}/data-labeling`
-                        : `/playground/${playground.id}`
+                        : playground.type === "curation"
+                          ? `/playground/${playground.id}/curation`
+                          : `/playground/${playground.id}`
                     }
                     className="block"
                   >
@@ -206,15 +215,15 @@ export default function TesterDashboard() {
                             <span className="font-semibold text-green-900">
                               {playground.payment_type === "per_hour" &&
                                 `R$ ${playground.payment_value?.toFixed(
-                                  2
+                                  2,
                                 )}/hora`}
                               {playground.payment_type === "per_task" &&
                                 `R$ ${playground.payment_value?.toFixed(
-                                  2
+                                  2,
                                 )}/task`}
                               {playground.payment_type === "per_goal" &&
                                 `R$ ${playground.payment_value?.toFixed(
-                                  2
+                                  2,
                                 )} a cada ${playground.tasks_for_goal} tasks`}
                             </span>
                           </div>
@@ -233,8 +242,10 @@ export default function TesterDashboard() {
                             {playground.type === "ab_testing"
                               ? "A/B Testing"
                               : playground.type === "data_labeling"
-                              ? "Rotulação"
-                              : "Tuning"}
+                                ? "Rotulação"
+                                : playground.type === "curation"
+                                  ? "Curadoria"
+                                  : "Tuning"}
                           </span>
                           <span className="text-gray-600 font-medium">
                             {playground.type === "data_labeling" &&
@@ -305,7 +316,11 @@ export default function TesterDashboard() {
                         <span className="badge badge-gray opacity-50">
                           {playground.type === "ab_testing"
                             ? "A/B Testing"
-                            : "Tuning"}
+                            : playground.type === "data_labeling"
+                              ? "Rotulação"
+                              : playground.type === "curation"
+                                ? "Curadoria"
+                                : "Tuning"}
                         </span>
                         <span className="text-gray-400 font-medium">
                           {totalEvaluations} de {evaluationGoal} avaliações

@@ -25,6 +25,14 @@ export const config = {
   frontend: {
     url: process.env.FRONTEND_URL || 'http://localhost:3000',
   },
+  elevenlabs: {
+    apiKey: process.env.ELEVENLABS_API_KEY || '',
+    baseUrl: process.env.ELEVENLABS_BASE_URL || 'https://api.elevenlabs.io',
+    agentIds: (process.env.ELEVENLABS_AGENT_IDS || '').split(',').filter(Boolean),
+    insightsEndpoint: process.env.ELEVENLABS_INSIGHTS_ENDPOINT_TEMPLATE || '/v1/convai/analytics/live-count',
+    callsEndpoint: process.env.ELEVENLABS_CALLS_ENDPOINT_TEMPLATE || '/v1/convai/conversations',
+    callDetailEndpoint: process.env.ELEVENLABS_CALL_DETAIL_ENDPOINT_TEMPLATE || '/v1/convai/conversations/{conversation_id}',
+  },
 };
 
 export function validateConfig() {

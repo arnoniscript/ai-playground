@@ -2,7 +2,8 @@
 
 export type UserRole = 'admin' | 'manager' | 'tester' | 'client' | 'qa';
 export type UserStatus = 'active' | 'pending_invite' | 'blocked' | 'pending_approval';
-export type PlaygroundType = 'ab_testing' | 'tuning' | 'data_labeling';
+export type PlaygroundType = 'ab_testing' | 'tuning' | 'data_labeling' | 'curation';
+export type CurationMode = 'continuous' | 'date_range';
 export type QuestionType = 'select' | 'input_string' | 'boolean';
 export type AccessControlType = 'open' | 'email_restricted' | 'explicit_authorization';
 export type PaymentType = 'per_hour' | 'per_task' | 'per_goal';
@@ -64,6 +65,12 @@ export interface Playground {
   repetitions_per_task: number | null;
   auto_calculate_evaluations: boolean;
   has_returned_tasks: boolean;
+  // Curation specific fields
+  curation_mode: CurationMode | null;
+  curation_agent_id: string | null;
+  curation_date_start: string | null;
+  curation_date_end: string | null;
+  curation_passes_per_conversation: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -377,3 +384,62 @@ export interface ConsolidateParentTaskRequest {
   admin_notes?: string;
   extra_repetitions?: number;
 }
+
+// Curation System Types
+
+export type CurationConversationStatus = 'pending' | 'in_progress' | 'completed' | 'excluded';
+
+export interface CurationConversation {
+  id: string;
+  playground_id: string;
+  conversation_id: string;
+  agent_id: string;
+  duration_seconds: number | null;
+  call_datetime: string | null;
+  transcript: any | null;
+  audio_url: string | null;
+  call_status: string | null;
+  call_termination_reason: string | null;
+  status: CurationConversationStatus;
+  selected: boolean;
+  max_passes: number;
+  current_passes: number;
+  metadata: any | null;
+  synced_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CurationEvaluation {
+  id: string;
+  conversation_record_id: string;
+  user_id: string;
+  session_id: string;
+  evaluated_at: string;
+}
+
+export interface NextCurationConversation {
+  conversation_record_id: string;
+  conversation_id: string;
+  agent_id: string;
+  duration_seconds: number | null;
+  call_datetime: string | null;
+  transcript: any | null;
+  audio_url: string | null;
+  call_status: string | null;
+  call_termination_reason: string | null;
+  metadata: any | null;
+}
+
+export interface CurationMetrics {
+  total_conversations: number;
+  selected_conversations: number;
+  pending_conversations: number;
+  in_progress_conversations: number;
+  completed_conversations: number;
+  excluded_conversations: number;
+  total_expected_evaluations: number;
+  completed_evaluations: number;
+  completion_percentage: number;
+}
+

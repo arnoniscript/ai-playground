@@ -13,7 +13,7 @@ export const VerifyOTPSchema = z.object({
 // Playground Schemas
 export const CreatePlaygroundSchema = z.object({
   name: z.string().min(3).max(255),
-  type: z.enum(['ab_testing', 'tuning', 'data_labeling']),
+  type: z.enum(['ab_testing', 'tuning', 'data_labeling', 'curation']),
   description: z.string().optional(),
   support_text: z.string().optional(), // Can contain HTML
   restricted_emails: z.array(z.string().email()).optional().nullable(),
@@ -32,6 +32,12 @@ export const CreatePlaygroundSchema = z.object({
   })).optional().default([]),
   repetitions_per_task: z.number().int().positive().optional().nullable(),
   auto_calculate_evaluations: z.boolean().optional().nullable(),
+  // Curation specific fields
+  curation_mode: z.enum(['continuous', 'date_range']).optional().nullable(),
+  curation_agent_id: z.string().optional().nullable(),
+  curation_date_start: z.string().optional().nullable(),
+  curation_date_end: z.string().optional().nullable(),
+  curation_passes_per_conversation: z.number().int().positive().optional().nullable(),
   models: z.array(z.object({
     model_key: z.string(),
     model_name: z.string(),

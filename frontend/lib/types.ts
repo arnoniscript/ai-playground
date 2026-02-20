@@ -45,7 +45,7 @@ export interface User {
 export interface Playground {
   id: string;
   name: string;
-  type: 'ab_testing' | 'tuning' | 'data_labeling';
+  type: 'ab_testing' | 'tuning' | 'data_labeling' | 'curation';
   description: string | null;
   support_text: string | null;
   created_by: string;
@@ -65,11 +65,26 @@ export interface Playground {
   repetitions_per_task: number | null;
   auto_calculate_evaluations: boolean;
   has_returned_tasks: boolean;
+  // Curation specific fields
+  curation_mode: 'continuous' | 'date_range' | null;
+  curation_agent_id: string | null;
+  curation_date_start: string | null;
+  curation_date_end: string | null;
+  curation_passes_per_conversation: number | null;
   data_labeling_progress?: {
     total_tasks: number;
     consolidated_tasks: number;
     expected_evaluations: number;
     completed_evaluations: number;
+  };
+  curation_progress?: {
+    total_conversations: number;
+    selected_conversations: number;
+    pending_conversations: number;
+    completed_conversations: number;
+    total_expected_evaluations: number;
+    completed_evaluations: number;
+    completion_percentage: number;
   };
   models?: ModelConfiguration[];
   questions?: Question[];
@@ -447,4 +462,55 @@ export interface ConsolidateParentTaskRequest {
   action: 'consolidate' | 'return_to_pipe';
   admin_notes?: string;
   extra_repetitions?: number;
+}
+
+// Curation System Types
+
+export type CurationMode = 'continuous' | 'date_range';
+export type CurationConversationStatus = 'pending' | 'in_progress' | 'completed' | 'excluded';
+
+export interface CurationConversation {
+  id: string;
+  playground_id: string;
+  conversation_id: string;
+  agent_id: string;
+  duration_seconds: number | null;
+  call_datetime: string | null;
+  transcript: any | null;
+  audio_url: string | null;
+  call_status: string | null;
+  call_termination_reason: string | null;
+  status: CurationConversationStatus;
+  selected: boolean;
+  max_passes: number;
+  current_passes: number;
+  metadata: any | null;
+  synced_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface NextCurationConversation {
+  conversation_record_id: string;
+  conversation_id: string;
+  agent_id: string;
+  duration_seconds: number | null;
+  call_datetime: string | null;
+  transcript: any | null;
+  audio_url: string | null;
+  call_status: string | null;
+  call_termination_reason: string | null;
+  metadata: any | null;
+}
+
+export interface CurationMetrics {
+  total_conversations: number;
+  selected_conversations: number;
+  pending_conversations: number;
+  in_progress_conversations: number;
+  completed_conversations: number;
+  excluded_conversations: number;
+  total_expected_evaluations: number;
+  completed_evaluations: number;
+  completion_percentage: number;
 }

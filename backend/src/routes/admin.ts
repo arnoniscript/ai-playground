@@ -96,6 +96,27 @@ router.get('/playgrounds', adminOnly, async (req: Request, res: Response) => {
             counters: [], // Empty for data_labeling
             data_labeling_progress: progressData
           };
+        } else if (playground.type === 'curation') {
+          // For curation playgrounds, fetch curation metrics
+          const { data: metrics } = await db.rpc('get_curation_metrics', {
+            p_playground_id: playground.id,
+          });
+
+          const curationMetrics = metrics?.[0] || {
+            total_conversations: 0,
+            selected_conversations: 0,
+            pending_conversations: 0,
+            completed_conversations: 0,
+            total_expected_evaluations: 0,
+            completed_evaluations: 0,
+            completion_percentage: 0,
+          };
+
+          return {
+            ...playground,
+            counters: [],
+            curation_progress: curationMetrics,
+          };
         } else {
           // For AB testing and tuning, fetch model counters
           const { data: counters } = await db
@@ -221,6 +242,12 @@ router.post('/playgrounds', adminOnly, async (req: Request, res: Response) => {
       tools: payload.tools || [],
       repetitions_per_task: payload.repetitions_per_task || null,
       auto_calculate_evaluations: payload.auto_calculate_evaluations || false,
+      // Curation specific fields
+      curation_mode: payload.curation_mode || null,
+      curation_agent_id: payload.curation_agent_id || null,
+      curation_date_start: payload.curation_date_start || null,
+      curation_date_end: payload.curation_date_end || null,
+      curation_passes_per_conversation: payload.curation_passes_per_conversation || null,
     };
     
     console.log('Insert data tools:', insertData.tools);
@@ -239,7 +266,7 @@ router.post('/playgrounds', adminOnly, async (req: Request, res: Response) => {
     console.log('Playground created with tools:', playground.tools);
 
     // Only create models and counters for ab_testing and tuning playgrounds
-    if (payload.type !== 'data_labeling' && payload.models && payload.models.length > 0) {
+    if (payload.type !== 'data_labeling' && payload.type !== 'curation' && payload.models && payload.models.length > 0) {
       // Create models
       const modelInserts = payload.models.map(model => ({
         playground_id: playgroundId,

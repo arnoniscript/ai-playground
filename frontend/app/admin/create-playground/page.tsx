@@ -9,8 +9,9 @@ import api from "@/lib/api";
 // Force dynamic rendering
 export const dynamic = "force-dynamic";
 
-type PlaygroundType = "ab_testing" | "tuning" | "data_labeling";
+type PlaygroundType = "ab_testing" | "tuning" | "data_labeling" | "curation";
 type QuestionType = "select" | "input_string" | "boolean";
+type CurationMode = "continuous" | "date_range";
 
 interface ModelInput {
   key: string;
@@ -88,6 +89,14 @@ function CreatePlaygroundForm() {
     useState<boolean>(true);
   const [isUploadingZip, setIsUploadingZip] = useState<boolean>(false);
   const [uploadedTasksCount, setUploadedTasksCount] = useState<number>(0);
+
+  // Curation specific states
+  const [curationMode, setCurationMode] = useState<CurationMode>("continuous");
+  const [curationAgentId, setCurationAgentId] = useState<string>("");
+  const [curationDateStart, setCurationDateStart] = useState<string>("");
+  const [curationDateEnd, setCurationDateEnd] = useState<string>("");
+  const [curationPassesPerConversation, setCurationPassesPerConversation] =
+    useState<number>(1);
 
   // Models
   const [models, setModels] = useState<ModelInput[]>([
@@ -287,6 +296,7 @@ function CreatePlaygroundForm() {
 
     if (
       type !== "data_labeling" &&
+      type !== "curation" &&
       models.some((m) => !m.key.trim() || !m.embedCode.trim())
     ) {
       setError("Todos os modelos precisam de chave e código embed");
@@ -304,6 +314,37 @@ function CreatePlaygroundForm() {
       if (repetitionsPerTask < 1) {
         setError("Número de repetições por task deve ser pelo menos 1");
         return;
+      }
+    }
+
+    // Curation specific validation
+    if (type === "curation") {
+      if (!curationAgentId.trim()) {
+        setError("Agent ID é obrigatório para curadoria");
+        return;
+      }
+      if (curationMode === "date_range") {
+        if (!curationDateStart || !curationDateEnd) {
+          setError(
+            "Data inicial e final são obrigatórias para curadoria com range de datas",
+          );
+          return;
+        }
+        const start = new Date(curationDateStart);
+        const end = new Date(curationDateEnd);
+        const now = new Date();
+        if (start > now || end > now) {
+          setError("As datas devem ser no passado");
+          return;
+        }
+        if (start >= end) {
+          setError("Data inicial deve ser anterior à data final");
+          return;
+        }
+        if (curationPassesPerConversation < 1) {
+          setError("Vezes por conversa deve ser pelo menos 1");
+          return;
+        }
       }
     }
 
@@ -406,9 +447,24 @@ function CreatePlaygroundForm() {
           type === "data_labeling" ? repetitionsPerTask : null,
         auto_calculate_evaluations:
           type === "data_labeling" ? autoCalculateEvaluations : false,
+        // Curation specific fields
+        curation_mode: type === "curation" ? curationMode : null,
+        curation_agent_id: type === "curation" ? curationAgentId : null,
+        curation_date_start:
+          type === "curation" && curationMode === "date_range"
+            ? new Date(curationDateStart).toISOString()
+            : null,
+        curation_date_end:
+          type === "curation" && curationMode === "date_range"
+            ? new Date(curationDateEnd).toISOString()
+            : null,
+        curation_passes_per_conversation:
+          type === "curation" && curationMode === "date_range"
+            ? curationPassesPerConversation
+            : null,
         tools,
         models:
-          type !== "data_labeling"
+          type !== "data_labeling" && type !== "curation"
             ? models.map((m) => ({
                 model_key: m.key,
                 model_name: m.key, // Using key as name for now
@@ -540,13 +596,16 @@ function CreatePlaygroundForm() {
                     <option value="ab_testing">Teste A/B</option>
                     <option value="tuning">Ajuste (Tuning)</option>
                     <option value="data_labeling">Rotulação de Dados</option>
+                    <option value="curation">Curadoria</option>
                   </select>
                   <p className="text-xs text-gray-500 mt-1">
                     {type === "ab_testing"
                       ? "Usuários avaliam 2 modelos e escolhem o melhor"
                       : type === "tuning"
                         ? "Usuários avaliam 1 modelo múltiplas vezes"
-                        : "Usuários rotulam arquivos (imagens, PDFs, textos) com perguntas personalizadas"}
+                        : type === "curation"
+                          ? "Curadoria de conversas de agentes ElevenLabs com transcrição e áudio"
+                          : "Usuários rotulam arquivos (imagens, PDFs, textos) com perguntas personalizadas"}
                   </p>
                 </div>
 
@@ -1378,8 +1437,149 @@ function CreatePlaygroundForm() {
               </section>
             )}
 
+            {/* Curation Configuration */}
+            {type === "curation" && (
+              <section className="bg-white border rounded-lg p-6">
+                <h2 className="text-xl font-semibold mb-4">
+                  🎧 Configuração de Curadoria
+                </h2>
+
+                <div className="space-y-6">
+                  {/* Agent Selection */}
+                  <div>
+                    <label className="block text-sm font-medium mb-1">
+                      Agent ID (ElevenLabs) *
+                    </label>
+                    <input
+                      type="text"
+                      value={curationAgentId}
+                      onChange={(e) => setCurationAgentId(e.target.value)}
+                      className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="agent_xxxx..."
+                      required
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      ID do agente ElevenLabs cujas conversas serão avaliadas
+                    </p>
+                  </div>
+
+                  {/* Curation Mode */}
+                  <div>
+                    <label className="block text-sm font-medium mb-1">
+                      Modo de Curadoria *
+                    </label>
+                    <select
+                      value={curationMode}
+                      onChange={(e) =>
+                        setCurationMode(e.target.value as CurationMode)
+                      }
+                      className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="continuous">Contínua</option>
+                      <option value="date_range">Range de Datas</option>
+                    </select>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {curationMode === "continuous"
+                        ? "Busca aleatoriamente uma conversa cada vez que o avaliador abre o playground"
+                        : "Permite selecionar um intervalo de datas e sincronizar as conversas"}
+                    </p>
+                  </div>
+
+                  {/* Date Range Fields (only for date_range mode) */}
+                  {curationMode === "date_range" && (
+                    <>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium mb-1">
+                            Data/Hora Inicial *
+                          </label>
+                          <input
+                            type="datetime-local"
+                            value={curationDateStart}
+                            onChange={(e) =>
+                              setCurationDateStart(e.target.value)
+                            }
+                            max={new Date().toISOString().slice(0, 16)}
+                            className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            required
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium mb-1">
+                            Data/Hora Final *
+                          </label>
+                          <input
+                            type="datetime-local"
+                            value={curationDateEnd}
+                            onChange={(e) => setCurationDateEnd(e.target.value)}
+                            max={new Date().toISOString().slice(0, 16)}
+                            className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            required
+                          />
+                        </div>
+                      </div>
+
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <p className="text-sm text-blue-800">
+                          📅 As datas devem ser no passado. Após criar o
+                          playground, acesse-o como admin para sincronizar as
+                          conversas e selecionar quais entrarão na curadoria.
+                        </p>
+                      </div>
+                    </>
+                  )}
+
+                  {/* Passes Per Conversation (for date_range mode) */}
+                  {curationMode === "date_range" && (
+                    <div>
+                      <label className="block text-sm font-medium mb-1">
+                        Vezes por conversa no pipe *
+                      </label>
+                      <input
+                        type="number"
+                        value={curationPassesPerConversation}
+                        onChange={(e) =>
+                          setCurationPassesPerConversation(
+                            parseInt(e.target.value) || 1,
+                          )
+                        }
+                        className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        min="1"
+                        max="100"
+                        required
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Quantas vezes cada conversa passará pelo pipe de
+                        avaliação (nunca repetindo o mesmo avaliador)
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="bg-yellow-50 border border-yellow-200 rounded p-3">
+                    <p className="text-sm text-yellow-800">
+                      {curationMode === "continuous" ? (
+                        <>
+                          🔄 <strong>Modo Contínuo:</strong> Cada vez que um
+                          avaliador abrir o playground, receberá aleatoriamente
+                          uma conversa. A mesma conversa pode aparecer para
+                          diferentes avaliadores, mas nunca para o mesmo.
+                        </>
+                      ) : (
+                        <>
+                          📋 <strong>Modo Range de Datas:</strong> Após criar o
+                          playground, acesse a aba de gerenciamento para
+                          sincronizar as conversas do período e selecionar quais
+                          entrarão no pipe de curadoria.
+                        </>
+                      )}
+                    </p>
+                  </div>
+                </div>
+              </section>
+            )}
+
             {/* Models */}
-            {type !== "data_labeling" && (
+            {type !== "data_labeling" && type !== "curation" && (
               <section className="bg-white border rounded-lg p-6">
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-xl font-semibold">

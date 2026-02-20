@@ -119,6 +119,27 @@ router.get('/', async (req: Request, res: Response) => {
             counters: [], // Empty for data_labeling
             data_labeling_progress: progressData
           };
+        } else if (playground.type === 'curation') {
+          // For curation playgrounds, fetch curation metrics
+          const { data: metrics } = await db.rpc('get_curation_metrics', {
+            p_playground_id: playground.id,
+          });
+
+          const curationMetrics = metrics?.[0] || {
+            total_conversations: 0,
+            selected_conversations: 0,
+            pending_conversations: 0,
+            completed_conversations: 0,
+            total_expected_evaluations: 0,
+            completed_evaluations: 0,
+            completion_percentage: 0,
+          };
+
+          return {
+            ...playground,
+            counters: [],
+            curation_progress: curationMetrics,
+          };
         } else {
           // For AB testing and tuning, fetch model counters
           const { data: counters } = await db
@@ -289,8 +310,8 @@ router.post('/:id/evaluations', async (req: Request, res: Response) => {
       return;
     }
 
-    // Skip model-specific checks for data_labeling playgrounds
-    if (playground.type !== 'data_labeling') {
+    // Skip model-specific checks for data_labeling and curation playgrounds
+    if (playground.type !== 'data_labeling' && playground.type !== 'curation') {
       // Check if model still has evaluations available
       const { data: counter, error: counterError } = await db
         .from('evaluation_counters')
@@ -344,8 +365,8 @@ router.post('/:id/evaluations', async (req: Request, res: Response) => {
       return;
     }
 
-    // Increment counter (only for non-data_labeling playgrounds)
-    if (playground.type !== 'data_labeling') {
+    // Increment counter (only for non-data_labeling and non-curation playgrounds)
+    if (playground.type !== 'data_labeling' && playground.type !== 'curation') {
       const { data: counter } = await db
         .from('evaluation_counters')
         .select('*')

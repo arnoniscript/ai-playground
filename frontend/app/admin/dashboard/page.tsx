@@ -40,7 +40,7 @@ export default function AdminDashboard() {
         console.log(`[ADMIN] Type: ${pg.type}`);
         console.log(
           `[ADMIN] Has data_labeling_progress:`,
-          !!pg.data_labeling_progress
+          !!pg.data_labeling_progress,
         );
         if (pg.data_labeling_progress) {
           console.log("[ADMIN] Progress data:", pg.data_labeling_progress);
@@ -72,7 +72,7 @@ export default function AdminDashboard() {
       // Store in localStorage to pre-fill the create form
       localStorage.setItem(
         "duplicatePlayground",
-        JSON.stringify(playgroundData)
+        JSON.stringify(playgroundData),
       );
 
       // Redirect to create page
@@ -80,7 +80,7 @@ export default function AdminDashboard() {
     } catch (error: any) {
       console.error("Failed to load playground for duplication:", error);
       alert(
-        error.response?.data?.error || "Erro ao carregar dados do playground"
+        error.response?.data?.error || "Erro ao carregar dados do playground",
       );
     } finally {
       setDuplicating(null);
@@ -261,8 +261,8 @@ export default function AdminDashboard() {
                                 {playground.type === "ab_testing"
                                   ? "📊 A/B Testing"
                                   : playground.type === "data_labeling"
-                                  ? "🏷️ Rotulação"
-                                  : "🎯 Tuning"}
+                                    ? "🏷️ Rotulação"
+                                    : "🎯 Tuning"}
                               </span>
                             </div>
                             <div className="flex flex-col">
@@ -276,7 +276,7 @@ export default function AdminDashboard() {
                                       .completed_evaluations
                                   : playground.counters?.reduce(
                                       (sum, c) => sum + c.current_count,
-                                      0
+                                      0,
                                     ) || 0}
                               </span>
                             </div>
@@ -308,13 +308,13 @@ export default function AdminDashboard() {
                                           total =
                                             playground.counters?.reduce(
                                               (sum, c) => sum + c.current_count,
-                                              0
+                                              0,
                                             ) || 0;
                                         }
 
                                         return Math.min(
                                           100,
-                                          (total / goal) * 100
+                                          (total / goal) * 100,
                                         );
                                       })()}%`,
                                     }}
@@ -339,7 +339,7 @@ export default function AdminDashboard() {
                                       total =
                                         playground.counters?.reduce(
                                           (sum, c) => sum + c.current_count,
-                                          0
+                                          0,
                                         ) || 0;
                                     }
 
@@ -357,7 +357,7 @@ export default function AdminDashboard() {
                               {playground.evaluation_goal} avaliações •{" "}
                               <span className="font-medium">Criado em:</span>{" "}
                               {new Date(
-                                playground.created_at
+                                playground.created_at,
                               ).toLocaleDateString("pt-BR", {
                                 day: "2-digit",
                                 month: "2-digit",
@@ -370,7 +370,11 @@ export default function AdminDashboard() {
 
                       <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex gap-3">
                         <Link
-                          href={`/admin/playground/${playground.id}/metrics`}
+                          href={
+                            playground.type === "curation"
+                              ? `/admin/playground/${playground.id}/curation-metrics`
+                              : `/admin/playground/${playground.id}/metrics`
+                          }
                           className="flex-1"
                         >
                           <button className="w-full px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 font-medium transition-colors">
