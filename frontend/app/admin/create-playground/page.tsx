@@ -26,6 +26,18 @@ interface QuestionInput {
   options?: string[];
 }
 
+interface PreviewConversation {
+  conversation_id: string;
+  agent_id: string;
+  call_duration_secs: number;
+  start_time_unix_secs: number;
+  status: string | null;
+  call_successful: string | null;
+  message_count: number;
+  call_summary_title: string | null;
+  selected: boolean; // local selection state
+}
+
 // Helper function for generating IDs (works in SSR and client)
 const generateId = () => {
   if (typeof crypto !== "undefined" && crypto.randomUUID) {
@@ -97,6 +109,12 @@ function CreatePlaygroundForm() {
   const [curationDateEnd, setCurationDateEnd] = useState<string>("");
   const [curationPassesPerConversation, setCurationPassesPerConversation] =
     useState<number>(1);
+  const [isSyncingConversations, setIsSyncingConversations] =
+    useState<boolean>(false);
+  const [previewConversations, setPreviewConversations] = useState<
+    PreviewConversation[]
+  >([]);
+  const [hasSynced, setHasSynced] = useState<boolean>(false);
 
   // Models
   const [models, setModels] = useState<ModelInput[]>([
@@ -274,6 +292,85 @@ function CreatePlaygroundForm() {
     setQuestions(updated);
   };
 
+  // ===== Curation: preview sync =====
+  const handlePreviewSync = async () => {
+    if (!curationAgentId.trim()) {
+      setError("Agent ID é obrigatório para sincronizar");
+      return;
+    }
+    if (!curationDateStart || !curationDateEnd) {
+      setError("Datas são obrigatórias para sincronizar");
+      return;
+    }
+
+    setError("");
+    setIsSyncingConversations(true);
+
+    try {
+      const response = await api.post("/curation/preview-conversations", {
+        agent_id: curationAgentId.trim(),
+        date_start: new Date(curationDateStart).toISOString(),
+        date_end: new Date(curationDateEnd).toISOString(),
+      });
+
+      const convs: PreviewConversation[] = (
+        response.data.conversations || []
+      ).map((c: any) => ({
+        ...c,
+        selected: true, // all selected by default
+      }));
+
+      setPreviewConversations(convs);
+      setHasSynced(true);
+
+      if (convs.length === 0) {
+        setError("Nenhuma conversa encontrada no período selecionado");
+      }
+    } catch (err: any) {
+      console.error("Error previewing conversations:", err);
+      setError(
+        err.response?.data?.error || "Erro ao buscar conversas do ElevenLabs",
+      );
+    } finally {
+      setIsSyncingConversations(false);
+    }
+  };
+
+  const toggleConversationSelection = (conversationId: string) => {
+    setPreviewConversations((prev) =>
+      prev.map((c) =>
+        c.conversation_id === conversationId
+          ? { ...c, selected: !c.selected }
+          : c,
+      ),
+    );
+  };
+
+  const toggleAllConversations = (selected: boolean) => {
+    setPreviewConversations((prev) => prev.map((c) => ({ ...c, selected })));
+  };
+
+  const selectedConversationsCount = previewConversations.filter(
+    (c) => c.selected,
+  ).length;
+
+  const formatDuration = (secs: number) => {
+    const m = Math.floor(secs / 60);
+    const s = secs % 60;
+    return `${m}:${String(s).padStart(2, "0")}`;
+  };
+
+  const formatDateTime = (unix: number) => {
+    if (!unix) return "—";
+    return new Date(unix * 1000).toLocaleString("pt-BR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -343,6 +440,16 @@ function CreatePlaygroundForm() {
         }
         if (curationPassesPerConversation < 1) {
           setError("Vezes por conversa deve ser pelo menos 1");
+          return;
+        }
+        if (!hasSynced) {
+          setError("Sincronize as conversas antes de criar o playground");
+          return;
+        }
+        if (selectedConversationsCount === 0) {
+          setError(
+            "Selecione pelo menos uma conversa para o pipeline de curadoria",
+          );
           return;
         }
       }
@@ -462,6 +569,19 @@ function CreatePlaygroundForm() {
           type === "curation" && curationMode === "date_range"
             ? curationPassesPerConversation
             : null,
+        // Pre-selected conversations (date_range curation only)
+        curation_conversations:
+          type === "curation" && curationMode === "date_range"
+            ? previewConversations
+                .filter((c) => c.selected)
+                .map((c) => ({
+                  conversation_id: c.conversation_id,
+                  call_duration_secs: c.call_duration_secs,
+                  start_time_unix_secs: c.start_time_unix_secs,
+                  status: c.status,
+                  call_successful: c.call_successful,
+                }))
+            : undefined,
         tools,
         models:
           type !== "data_labeling" && type !== "curation"
@@ -490,6 +610,13 @@ function CreatePlaygroundForm() {
       });
 
       const playgroundId = playgroundResponse.data.data.id;
+      const responseSyncResult = playgroundResponse.data.sync;
+
+      if (responseSyncResult) {
+        console.log(
+          `Conversations inserted: ${responseSyncResult.synced_count}`,
+        );
+      }
 
       // Upload ZIP file if data_labeling type and file is selected
       if (type === "data_labeling" && zipFiles.length > 0) {
@@ -1453,7 +1580,14 @@ function CreatePlaygroundForm() {
                     <input
                       type="text"
                       value={curationAgentId}
-                      onChange={(e) => setCurationAgentId(e.target.value)}
+                      onChange={(e) => {
+                        setCurationAgentId(e.target.value);
+                        // Reset sync state when agent changes
+                        if (hasSynced) {
+                          setHasSynced(false);
+                          setPreviewConversations([]);
+                        }
+                      }}
                       className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                       placeholder="agent_xxxx..."
                       required
@@ -1470,9 +1604,11 @@ function CreatePlaygroundForm() {
                     </label>
                     <select
                       value={curationMode}
-                      onChange={(e) =>
-                        setCurationMode(e.target.value as CurationMode)
-                      }
+                      onChange={(e) => {
+                        setCurationMode(e.target.value as CurationMode);
+                        setHasSynced(false);
+                        setPreviewConversations([]);
+                      }}
                       className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                       <option value="continuous">Contínua</option>
@@ -1496,9 +1632,13 @@ function CreatePlaygroundForm() {
                           <input
                             type="datetime-local"
                             value={curationDateStart}
-                            onChange={(e) =>
-                              setCurationDateStart(e.target.value)
-                            }
+                            onChange={(e) => {
+                              setCurationDateStart(e.target.value);
+                              if (hasSynced) {
+                                setHasSynced(false);
+                                setPreviewConversations([]);
+                              }
+                            }}
                             max={new Date().toISOString().slice(0, 16)}
                             className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                             required
@@ -1511,7 +1651,13 @@ function CreatePlaygroundForm() {
                           <input
                             type="datetime-local"
                             value={curationDateEnd}
-                            onChange={(e) => setCurationDateEnd(e.target.value)}
+                            onChange={(e) => {
+                              setCurationDateEnd(e.target.value);
+                              if (hasSynced) {
+                                setHasSynced(false);
+                                setPreviewConversations([]);
+                              }
+                            }}
                             max={new Date().toISOString().slice(0, 16)}
                             className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                             required
@@ -1519,13 +1665,180 @@ function CreatePlaygroundForm() {
                         </div>
                       </div>
 
-                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                        <p className="text-sm text-blue-800">
-                          📅 As datas devem ser no passado. Após criar o
-                          playground, acesse-o como admin para sincronizar as
-                          conversas e selecionar quais entrarão na curadoria.
-                        </p>
+                      {/* Sync Button */}
+                      <div className="flex items-center gap-4">
+                        <button
+                          type="button"
+                          onClick={handlePreviewSync}
+                          disabled={
+                            isSyncingConversations ||
+                            !curationAgentId.trim() ||
+                            !curationDateStart ||
+                            !curationDateEnd
+                          }
+                          className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 font-medium"
+                        >
+                          {isSyncingConversations
+                            ? "🔄 Buscando conversas..."
+                            : hasSynced
+                              ? "🔄 Re-sincronizar"
+                              : "🔄 Sincronizar Conversas"}
+                        </button>
+                        {hasSynced && (
+                          <span className="text-sm text-gray-600">
+                            {previewConversations.length} conversas encontradas
+                            · {selectedConversationsCount} selecionadas
+                          </span>
+                        )}
                       </div>
+
+                      {/* Conversations Table */}
+                      {hasSynced && previewConversations.length > 0 && (
+                        <div className="border rounded-lg overflow-hidden">
+                          <div className="bg-gray-50 px-4 py-3 flex items-center justify-between border-b">
+                            <h3 className="font-medium text-sm">
+                              Conversas do Período
+                            </h3>
+                            <div className="flex gap-2">
+                              <button
+                                type="button"
+                                onClick={() => toggleAllConversations(true)}
+                                className="px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
+                              >
+                                Selecionar Todas
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => toggleAllConversations(false)}
+                                className="px-3 py-1 text-xs bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
+                              >
+                                Desmarcar Todas
+                              </button>
+                            </div>
+                          </div>
+                          <div className="max-h-80 overflow-y-auto">
+                            <table className="w-full text-sm">
+                              <thead className="bg-gray-50 sticky top-0">
+                                <tr>
+                                  <th className="px-4 py-2 text-left w-10">
+                                    <input
+                                      type="checkbox"
+                                      checked={
+                                        selectedConversationsCount ===
+                                        previewConversations.length
+                                      }
+                                      onChange={(e) =>
+                                        toggleAllConversations(e.target.checked)
+                                      }
+                                      className="rounded"
+                                    />
+                                  </th>
+                                  <th className="px-4 py-2 text-left">ID</th>
+                                  <th className="px-4 py-2 text-left">
+                                    Duração
+                                  </th>
+                                  <th className="px-4 py-2 text-left">
+                                    Status
+                                  </th>
+                                  <th className="px-4 py-2 text-left">
+                                    Data/Hora
+                                  </th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y">
+                                {previewConversations.map((conv) => (
+                                  <tr
+                                    key={conv.conversation_id}
+                                    className={`hover:bg-gray-50 cursor-pointer ${
+                                      conv.selected
+                                        ? "bg-white"
+                                        : "bg-gray-100 opacity-60"
+                                    }`}
+                                    onClick={() =>
+                                      toggleConversationSelection(
+                                        conv.conversation_id,
+                                      )
+                                    }
+                                  >
+                                    <td className="px-4 py-2">
+                                      <input
+                                        type="checkbox"
+                                        checked={conv.selected}
+                                        onChange={() =>
+                                          toggleConversationSelection(
+                                            conv.conversation_id,
+                                          )
+                                        }
+                                        className="rounded"
+                                        onClick={(e) => e.stopPropagation()}
+                                      />
+                                    </td>
+                                    <td className="px-4 py-2 font-mono text-xs">
+                                      <span
+                                        title={`Clique para copiar: ${conv.conversation_id}`}
+                                        className="cursor-pointer hover:text-blue-600 hover:underline"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          navigator.clipboard.writeText(
+                                            conv.conversation_id,
+                                          );
+                                          const el = e.currentTarget;
+                                          const original = el.textContent;
+                                          el.textContent = "Copiado!";
+                                          setTimeout(
+                                            () =>
+                                              (el.textContent = original || ""),
+                                            1000,
+                                          );
+                                        }}
+                                      >
+                                        {conv.conversation_id.slice(0, 12)}...
+                                      </span>
+                                    </td>
+                                    <td className="px-4 py-2">
+                                      {formatDuration(conv.call_duration_secs)}
+                                    </td>
+                                    <td className="px-4 py-2">
+                                      <span
+                                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                                          conv.call_successful === "success"
+                                            ? "bg-green-100 text-green-800"
+                                            : conv.call_successful === "failure"
+                                              ? "bg-red-100 text-red-800"
+                                              : "bg-gray-100 text-gray-800"
+                                        }`}
+                                      >
+                                        {conv.call_successful ||
+                                          conv.status ||
+                                          "—"}
+                                      </span>
+                                    </td>
+                                    <td className="px-4 py-2 text-gray-600">
+                                      {formatDateTime(
+                                        conv.start_time_unix_secs,
+                                      )}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                          <div className="bg-gray-50 px-4 py-2 border-t text-xs text-gray-500">
+                            {selectedConversationsCount} de{" "}
+                            {previewConversations.length} conversas selecionadas
+                            para o pipeline
+                          </div>
+                        </div>
+                      )}
+
+                      {hasSynced && previewConversations.length === 0 && (
+                        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                          <p className="text-sm text-yellow-800">
+                            ⚠️ Nenhuma conversa encontrada neste período.
+                            Verifique o Agent ID e o intervalo de datas.
+                          </p>
+                        </div>
+                      )}
                     </>
                   )}
 
@@ -1566,10 +1879,10 @@ function CreatePlaygroundForm() {
                         </>
                       ) : (
                         <>
-                          📋 <strong>Modo Range de Datas:</strong> Após criar o
-                          playground, acesse a aba de gerenciamento para
-                          sincronizar as conversas do período e selecionar quais
-                          entrarão no pipe de curadoria.
+                          📋 <strong>Modo Range de Datas:</strong> Sincronize as
+                          conversas acima e selecione quais entrarão no pipeline
+                          de curadoria. Transcrição e áudio serão carregados sob
+                          demanda ao abrir cada conversa.
                         </>
                       )}
                     </p>
@@ -1811,14 +2124,34 @@ function CreatePlaygroundForm() {
             </section>
 
             {/* Submit */}
-            <div className="flex gap-3">
+            <div className="flex gap-3 items-center">
               <button
                 type="submit"
-                disabled={isSubmitting}
+                disabled={
+                  isSubmitting ||
+                  (type === "curation" &&
+                    curationMode === "date_range" &&
+                    (!hasSynced || selectedConversationsCount === 0))
+                }
                 className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
               >
-                {isSubmitting ? "Criando..." : "Criar Playground"}
+                {isSubmitting
+                  ? isUploadingZip
+                    ? "Fazendo upload..."
+                    : "Criando..."
+                  : type === "curation" &&
+                      curationMode === "date_range" &&
+                      hasSynced
+                    ? `Criar Playground (${selectedConversationsCount} conversas)`
+                    : "Criar Playground"}
               </button>
+              {type === "curation" &&
+                curationMode === "date_range" &&
+                !hasSynced && (
+                  <span className="text-sm text-amber-600">
+                    ⚠️ Sincronize e selecione as conversas antes
+                  </span>
+                )}
               <button
                 type="button"
                 onClick={() => router.push("/admin")}

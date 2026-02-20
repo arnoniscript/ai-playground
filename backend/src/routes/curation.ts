@@ -45,15 +45,14 @@ async function fetchConversations(agentId: string, opts?: {
   params.set('agent_id', agentId);
   if (opts?.cursor) params.set('cursor', opts.cursor);
   if (opts?.pageSize) params.set('page_size', String(opts.pageSize));
-  // ElevenLabs API uses call_successful filter, start/end as unix timestamps
-  // We'll pass ISO dates and convert
+  // ElevenLabs list API uses call_start_after_unix / call_start_before_unix
   if (opts?.startDate) {
     const ts = Math.floor(new Date(opts.startDate).getTime() / 1000);
-    params.set('start_unix', String(ts));
+    params.set('call_start_after_unix', String(ts));
   }
   if (opts?.endDate) {
     const ts = Math.floor(new Date(opts.endDate).getTime() / 1000);
-    params.set('end_unix', String(ts));
+    params.set('call_start_before_unix', String(ts));
   }
 
   const endpoint = config.elevenlabs.callsEndpoint;
@@ -69,6 +68,127 @@ async function fetchConversationDetail(conversationId: string): Promise<any> {
     conversationId,
   );
   return elevenLabsFetch(endpoint);
+}
+
+// ============================================================
+// Exported sync helper (reusable from admin route)
+// ============================================================
+
+/**
+ * Fetch all conversations (light metadata) from ElevenLabs for a given agent + date range.
+ * Returns raw conversation summaries – nothing is persisted.
+ */
+export async function fetchAllConversationsFromElevenLabs(opts: {
+  agentId: string;
+  dateStart?: string;
+  dateEnd?: string;
+}): Promise<any[]> {
+  const { agentId, dateStart, dateEnd } = opts;
+
+  let allConversations: any[] = [];
+  let cursor: string | undefined = undefined;
+  let hasMore = true;
+
+  while (hasMore) {
+    const result: any = await fetchConversations(agentId, {
+      cursor,
+      pageSize: 100,
+      startDate: dateStart,
+      endDate: dateEnd,
+    });
+
+    const conversations = result.conversations || [];
+    allConversations = [...allConversations, ...conversations];
+
+    if (result.has_more && result.next_cursor) {
+      cursor = result.next_cursor;
+    } else {
+      hasMore = false;
+    }
+  }
+
+  return allConversations;
+}
+
+/**
+ * Persist a set of pre-selected conversations into a playground.
+ * `conversations` can be the raw ElevenLabs summaries or objects with at least `conversation_id`.
+ * Does NOT fetch transcript or audio – those are loaded on demand.
+ */
+export async function insertConversationsForPlayground(opts: {
+  playgroundId: string;
+  agentId: string;
+  conversations: any[];
+  passesPerConversation?: number;
+}): Promise<{ synced_count: number }> {
+  const { playgroundId, agentId, conversations, passesPerConversation } = opts;
+  const passesCount = passesPerConversation || 1;
+
+  console.log(`=== INSERT ${conversations.length} conversations for playground ${playgroundId} ===`);
+
+  const inserted: CurationConversation[] = [];
+  for (const conv of conversations) {
+    const { data: record, error: insertError } = await supabase
+      .from('curation_conversations')
+      .upsert(
+        {
+          playground_id: playgroundId,
+          conversation_id: conv.conversation_id,
+          agent_id: agentId,
+          duration_seconds: conv.call_duration_secs || conv.duration_seconds || null,
+          call_datetime: conv.start_time_unix_secs
+            ? new Date(conv.start_time_unix_secs * 1000).toISOString()
+            : conv.call_datetime || null,
+          call_status: conv.call_successful || conv.status || null,
+          call_termination_reason: conv.end_reason || conv.termination_reason || null,
+          status: 'pending',
+          selected: true,
+          max_passes: passesCount,
+          current_passes: 0,
+          metadata: conv.metadata || null,
+          synced_at: new Date().toISOString(),
+        },
+        { onConflict: 'playground_id,conversation_id' },
+      )
+      .select()
+      .single();
+
+    if (!insertError && record) {
+      inserted.push(record);
+    } else if (insertError) {
+      console.error(`Error upserting conversation ${conv.conversation_id}:`, insertError);
+    }
+  }
+
+  console.log(`Synced ${inserted.length} conversations`);
+  return { synced_count: inserted.length };
+}
+
+/**
+ * Legacy helper – fetches from ElevenLabs AND inserts into DB in one go.
+ * Used by the manual re-sync route.
+ */
+export async function syncConversationsForPlayground(opts: {
+  playgroundId: string;
+  agentId: string;
+  dateStart?: string;
+  dateEnd?: string;
+  passesPerConversation?: number;
+}): Promise<{ total_fetched: number; synced_count: number }> {
+  const allConversations = await fetchAllConversationsFromElevenLabs({
+    agentId: opts.agentId,
+    dateStart: opts.dateStart,
+    dateEnd: opts.dateEnd,
+  });
+
+  const { synced_count } = await insertConversationsForPlayground({
+    playgroundId: opts.playgroundId,
+    agentId: opts.agentId,
+    conversations: allConversations,
+    passesPerConversation: opts.passesPerConversation,
+  });
+
+  return { total_fetched: allConversations.length, synced_count };
 }
 
 // ============================================================
@@ -92,6 +212,61 @@ router.get(
 );
 
 /**
+ * POST /curation/preview-conversations
+ * Fetch conversations (light metadata) from ElevenLabs for preview/selection BEFORE creating a playground.
+ * Nothing is persisted – this is purely a preview.
+ * Body: { agent_id, date_start, date_end }
+ */
+router.post(
+  '/preview-conversations',
+  authenticateToken,
+  asyncHandler(async (req, res) => {
+    const userRole = req.user!.role;
+    if (userRole !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    const { agent_id, date_start, date_end } = req.body;
+    if (!agent_id) {
+      return res.status(400).json({ error: 'agent_id is required' });
+    }
+
+    console.log(`=== PREVIEW CONVERSATIONS ===`);
+    console.log(`Agent: ${agent_id}, Start: ${date_start}, End: ${date_end}`);
+
+    try {
+      const allConversations = await fetchAllConversationsFromElevenLabs({
+        agentId: agent_id,
+        dateStart: date_start,
+        dateEnd: date_end,
+      });
+
+      // Return lightweight summaries for the frontend table
+      const conversations = allConversations.map((c: any) => ({
+        conversation_id: c.conversation_id,
+        agent_id: c.agent_id,
+        call_duration_secs: c.call_duration_secs || 0,
+        start_time_unix_secs: c.start_time_unix_secs || 0,
+        status: c.status || null,
+        call_successful: c.call_successful || null,
+        message_count: c.message_count || 0,
+        call_summary_title: c.call_summary_title || null,
+      }));
+
+      console.log(`Preview: ${conversations.length} conversations found`);
+
+      res.json({
+        conversations,
+        total: conversations.length,
+      });
+    } catch (error: any) {
+      console.error('Error previewing conversations:', error);
+      res.status(500).json({ error: `Failed to fetch conversations: ${error.message}` });
+    }
+  }),
+);
+
+/**
  * POST /curation/sync-conversations/:playgroundId
  * Sync conversations from ElevenLabs for a date-range curation playground.
  * Body: { agent_id, date_start, date_end, passes_per_conversation? }
@@ -101,7 +276,6 @@ router.post(
   authenticateToken,
   asyncHandler(async (req, res) => {
     const { playgroundId } = req.params;
-    const userId = req.user!.id;
     const userRole = req.user!.role;
 
     if (userRole !== 'admin') {
@@ -129,79 +303,18 @@ router.post(
       return res.status(400).json({ error: 'Playground must be curation type' });
     }
 
-    console.log(`=== SYNC CONVERSATIONS for playground ${playgroundId} ===`);
-    console.log(`Agent: ${agent_id}, Start: ${date_start}, End: ${date_end}`);
-
     try {
-      let allConversations: any[] = [];
-      let cursor: string | undefined = undefined;
-      let hasMore = true;
-
-      // Paginate through all conversations
-      while (hasMore) {
-        const result: any = await fetchConversations(agent_id, {
-          cursor,
-          pageSize: 100,
-          startDate: date_start,
-          endDate: date_end,
-        });
-
-        const conversations = result.conversations || [];
-        allConversations = [...allConversations, ...conversations];
-
-        // Check if there's a next page
-        if (result.has_more && result.next_cursor) {
-          cursor = result.next_cursor;
-        } else {
-          hasMore = false;
-        }
-      }
-
-      console.log(`Fetched ${allConversations.length} conversations from ElevenLabs`);
-
-      const passesCount = passes_per_conversation || 1;
-
-      // Insert conversations into database (upsert to avoid duplicates)
-      const inserted: CurationConversation[] = [];
-      for (const conv of allConversations) {
-        const { data: record, error: insertError } = await supabase
-          .from('curation_conversations')
-          .upsert(
-            {
-              playground_id: playgroundId,
-              conversation_id: conv.conversation_id,
-              agent_id: agent_id,
-              duration_seconds: conv.call_duration_secs || conv.duration || null,
-              call_datetime: conv.start_time_unix_secs
-                ? new Date(conv.start_time_unix_secs * 1000).toISOString()
-                : conv.start_time || null,
-              call_status: conv.call_successful || conv.status || null,
-              call_termination_reason: conv.end_reason || conv.termination_reason || null,
-              status: 'pending',
-              selected: true,
-              max_passes: passesCount,
-              current_passes: 0,
-              metadata: conv.metadata || null,
-              synced_at: new Date().toISOString(),
-            },
-            { onConflict: 'playground_id,conversation_id' },
-          )
-          .select()
-          .single();
-
-        if (!insertError && record) {
-          inserted.push(record);
-        } else if (insertError) {
-          console.error(`Error upserting conversation ${conv.conversation_id}:`, insertError);
-        }
-      }
-
-      console.log(`Synced ${inserted.length} conversations`);
+      const result = await syncConversationsForPlayground({
+        playgroundId,
+        agentId: agent_id,
+        dateStart: date_start,
+        dateEnd: date_end,
+        passesPerConversation: passes_per_conversation,
+      });
 
       res.json({
-        message: `Synced ${inserted.length} conversations`,
-        total_fetched: allConversations.length,
-        synced_count: inserted.length,
+        message: `Synced ${result.synced_count} conversations`,
+        ...result,
       });
     } catch (error: any) {
       console.error('Error syncing conversations:', error);

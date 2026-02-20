@@ -543,7 +543,18 @@ export default function CurationEvaluationPage() {
                                   />
                                 </td>
                                 <td className="p-3 font-mono text-xs">
-                                  {conv.conversation_id.substring(0, 16)}...
+                                  <span
+                                    title={`Clique para copiar: ${conv.conversation_id}`}
+                                    className="cursor-pointer hover:text-blue-600 hover:underline"
+                                    onClick={() => {
+                                      navigator.clipboard.writeText(
+                                        conv.conversation_id,
+                                      );
+                                      alert("ID copiado!");
+                                    }}
+                                  >
+                                    {conv.conversation_id.substring(0, 16)}...
+                                  </span>
                                 </td>
                                 <td className="p-3">
                                   {formatDuration(conv.duration_seconds)}

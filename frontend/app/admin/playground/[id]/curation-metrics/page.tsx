@@ -812,7 +812,19 @@ export default function CurationMetricsPage() {
                       className="border-b last:border-0 hover:bg-gray-50"
                     >
                       <td className="py-3 px-4 font-mono text-xs">
-                        {conv.conversation_id.substring(0, 12)}...
+                        <span
+                          title={`Clique para copiar: ${conv.conversation_id}`}
+                          className="cursor-pointer hover:text-blue-600 hover:underline"
+                          onClick={() => {
+                            navigator.clipboard.writeText(conv.conversation_id);
+                            const el =
+                              document.activeElement as HTMLElement | null;
+                            if (el) el.blur();
+                            alert("ID copiado!");
+                          }}
+                        >
+                          {conv.conversation_id.substring(0, 12)}...
+                        </span>
                       </td>
                       <td className="py-3 px-4 whitespace-nowrap">
                         {formatDate(conv.call_datetime)}

@@ -9,6 +9,7 @@ import {
   getPlaygroundAuthorizedUsers 
 } from '../utils/playground-access.js';
 import { sendInviteEmail } from '../utils/email.js';
+import { syncConversationsForPlayground, insertConversationsForPlayground } from './curation.js';
 
 const router = Router();
 
@@ -315,9 +316,35 @@ router.post('/playgrounds', adminOnly, async (req: Request, res: Response) => {
       if (questionsError) throw questionsError;
     }
 
+    // For date_range curation playgrounds, insert pre-selected conversations
+    // The admin already previewed & selected conversations in the creation form
+    let syncResult: { synced_count: number } | null = null;
+    if (
+      payload.type === 'curation' &&
+      payload.curation_mode === 'date_range' &&
+      payload.curation_agent_id
+    ) {
+      const conversations: any[] = (req.body as any).curation_conversations || [];
+      if (conversations.length > 0) {
+        try {
+          console.log(`=== INSERTING ${conversations.length} pre-selected conversations ===`);
+          syncResult = await insertConversationsForPlayground({
+            playgroundId,
+            agentId: payload.curation_agent_id,
+            conversations,
+            passesPerConversation: payload.curation_passes_per_conversation || 1,
+          });
+          console.log(`Inserted ${syncResult.synced_count} conversations`);
+        } catch (syncError) {
+          console.error('Failed to insert conversations (playground was created):', syncError);
+        }
+      }
+    }
+
     res.status(201).json({
       data: playground,
       message: 'Playground created successfully',
+      sync: syncResult,
     });
   } catch (error) {
     console.error('Error creating playground:', error);

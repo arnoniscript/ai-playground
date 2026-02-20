@@ -14,6 +14,7 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [duplicating, setDuplicating] = useState<string | null>(null);
   const [showActive, setShowActive] = useState(true);
+  const [typeFilter, setTypeFilter] = useState<string>("all");
   const [pendingUsersCount, setPendingUsersCount] = useState(0);
 
   useEffect(() => {
@@ -148,35 +149,69 @@ export default function AdminDashboard() {
             {/* Filter Toggle */}
             <div className="bg-white rounded-lg border border-gray-200 p-4">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <span className="text-sm font-medium text-gray-700">
-                    Filtrar por status:
-                  </span>
-                  <div className="flex bg-gray-100 rounded-lg p-1">
-                    <button
-                      onClick={() => setShowActive(true)}
-                      className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
-                        showActive
-                          ? "bg-white text-blue-600 shadow-sm"
-                          : "text-gray-600 hover:text-gray-900"
-                      }`}
-                    >
-                      🟢 Ativos
-                    </button>
-                    <button
-                      onClick={() => setShowActive(false)}
-                      className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
-                        !showActive
-                          ? "bg-white text-gray-900 shadow-sm"
-                          : "text-gray-600 hover:text-gray-900"
-                      }`}
-                    >
-                      ⚫ Desativados
-                    </button>
+                <div className="flex items-center gap-6">
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm font-medium text-gray-700">
+                      Status:
+                    </span>
+                    <div className="flex bg-gray-100 rounded-lg p-1">
+                      <button
+                        onClick={() => setShowActive(true)}
+                        className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                          showActive
+                            ? "bg-white text-blue-600 shadow-sm"
+                            : "text-gray-600 hover:text-gray-900"
+                        }`}
+                      >
+                        🟢 Ativos
+                      </button>
+                      <button
+                        onClick={() => setShowActive(false)}
+                        className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                          !showActive
+                            ? "bg-white text-gray-900 shadow-sm"
+                            : "text-gray-600 hover:text-gray-900"
+                        }`}
+                      >
+                        ⚫ Desativados
+                      </button>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm font-medium text-gray-700">
+                      Tipo:
+                    </span>
+                    <div className="flex bg-gray-100 rounded-lg p-1">
+                      {[
+                        { value: "all", label: "Todos" },
+                        { value: "tuning", label: "🎯 Tuning" },
+                        { value: "ab_testing", label: "📊 A/B" },
+                        { value: "data_labeling", label: "🏷️ Rotulação" },
+                        { value: "curation", label: "🎧 Curadoria" },
+                      ].map((opt) => (
+                        <button
+                          key={opt.value}
+                          onClick={() => setTypeFilter(opt.value)}
+                          className={`px-3 py-2 rounded-md text-sm font-medium transition-all ${
+                            typeFilter === opt.value
+                              ? "bg-white text-blue-600 shadow-sm"
+                              : "text-gray-600 hover:text-gray-900"
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
                 <div className="text-sm text-gray-500">
-                  {playgrounds.filter((p) => p.is_active === showActive).length}{" "}
+                  {
+                    playgrounds.filter(
+                      (p) =>
+                        p.is_active === showActive &&
+                        (typeFilter === "all" || p.type === typeFilter),
+                    ).length
+                  }{" "}
                   playground(s)
                 </div>
               </div>
@@ -195,12 +230,15 @@ export default function AdminDashboard() {
                   </button>
                 </Link>
               </div>
-            ) : playgrounds.filter((p) => p.is_active === showActive).length ===
-              0 ? (
+            ) : playgrounds.filter(
+                (p) =>
+                  p.is_active === showActive &&
+                  (typeFilter === "all" || p.type === typeFilter),
+              ).length === 0 ? (
               <div className="bg-gray-50 p-12 rounded-lg text-center">
                 <p className="text-gray-600 mb-4">
-                  Nenhum playground {showActive ? "ativo" : "desativado"}{" "}
-                  encontrado.
+                  Nenhum playground {showActive ? "ativo" : "desativado"}
+                  {typeFilter !== "all" ? " deste tipo" : ""} encontrado.
                 </p>
                 {!showActive && (
                   <button
@@ -214,7 +252,11 @@ export default function AdminDashboard() {
             ) : (
               <div className="grid grid-cols-1 gap-6">
                 {playgrounds
-                  .filter((p) => p.is_active === showActive)
+                  .filter(
+                    (p) =>
+                      p.is_active === showActive &&
+                      (typeFilter === "all" || p.type === typeFilter),
+                  )
                   .map((playground) => (
                     <div
                       key={playground.id}
@@ -262,7 +304,9 @@ export default function AdminDashboard() {
                                   ? "📊 A/B Testing"
                                   : playground.type === "data_labeling"
                                     ? "🏷️ Rotulação"
-                                    : "🎯 Tuning"}
+                                    : playground.type === "curation"
+                                      ? "🎧 Curadoria"
+                                      : "🎯 Tuning"}
                               </span>
                             </div>
                             <div className="flex flex-col">
@@ -274,10 +318,14 @@ export default function AdminDashboard() {
                                 playground.data_labeling_progress
                                   ? playground.data_labeling_progress
                                       .completed_evaluations
-                                  : playground.counters?.reduce(
-                                      (sum, c) => sum + c.current_count,
-                                      0,
-                                    ) || 0}
+                                  : playground.type === "curation" &&
+                                      playground.curation_progress
+                                    ? playground.curation_progress
+                                        .completed_evaluations
+                                    : playground.counters?.reduce(
+                                        (sum, c) => sum + c.current_count,
+                                        0,
+                                      ) || 0}
                               </span>
                             </div>
                             <div className="flex flex-col">
@@ -304,6 +352,17 @@ export default function AdminDashboard() {
                                           goal =
                                             playground.data_labeling_progress
                                               .expected_evaluations || goal;
+                                        } else if (
+                                          playground.type === "curation" &&
+                                          playground.curation_progress
+                                        ) {
+                                          total =
+                                            playground.curation_progress
+                                              .completed_evaluations;
+                                          goal =
+                                            playground.curation_progress
+                                              .total_expected_evaluations ||
+                                            goal;
                                         } else {
                                           total =
                                             playground.counters?.reduce(
@@ -335,6 +394,16 @@ export default function AdminDashboard() {
                                       goal =
                                         playground.data_labeling_progress
                                           .expected_evaluations || goal;
+                                    } else if (
+                                      playground.type === "curation" &&
+                                      playground.curation_progress
+                                    ) {
+                                      total =
+                                        playground.curation_progress
+                                          .completed_evaluations;
+                                      goal =
+                                        playground.curation_progress
+                                          .total_expected_evaluations || goal;
                                     } else {
                                       total =
                                         playground.counters?.reduce(
