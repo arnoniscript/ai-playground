@@ -415,7 +415,7 @@ export default function RegisterQAPage() {
                     ...errors,
                     geolocation: t("qa.registration.step5.error"),
                   });
-                }
+                },
               );
             } else {
               setErrors({
@@ -452,7 +452,7 @@ export default function RegisterQAPage() {
                   const mediaStream = await navigator.mediaDevices.getUserMedia(
                     {
                       video: { width: 640, height: 480 },
-                    }
+                    },
                   );
                   setStream(mediaStream);
                 } catch (error) {
@@ -749,12 +749,12 @@ export default function RegisterQAPage() {
     setLoading(true);
     try {
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/auth/register-qa`,
+        `${(process.env.NEXT_PUBLIC_API_URL || "").replace(/\/+$/, "")}/auth/register-qa`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(formData),
-        }
+        },
       );
 
       const data = await response.json();

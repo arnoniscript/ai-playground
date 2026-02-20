@@ -703,7 +703,7 @@ export default function CurationEvaluationPage() {
                     <audio
                       controls
                       className="w-full"
-                      src={`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"}/curation/audio/${currentConversation.conversation_id}?token=${token}`}
+                      src={`${(process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001").replace(/\/+$/, "")}/curation/audio/${currentConversation.conversation_id}?token=${token}`}
                     >
                       Seu navegador não suporta o elemento de áudio.
                     </audio>

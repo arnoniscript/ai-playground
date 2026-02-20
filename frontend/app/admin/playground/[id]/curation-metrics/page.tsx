@@ -20,7 +20,9 @@ import {
   Cell,
 } from "recharts";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+const API_URL = (
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"
+).replace(/\/+$/, "");
 
 const COLORS = [
   "#0088FE",
@@ -389,7 +391,7 @@ export default function CurationMetricsPage() {
   };
 
   const audioUrl = (conversationId: string) =>
-    `${API_URL}curation/audio/${conversationId}?token=${token}`;
+    `${API_URL}/curation/audio/${conversationId}?token=${token}`;
 
   // Filtered conversations
   const filteredConversations = conversations.filter((c) => {
