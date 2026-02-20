@@ -84,6 +84,8 @@ interface ConversationWithEvals {
   current_passes: number;
   evaluations: ConversationEvaluation[];
   evaluation_count: number;
+  clickup_task_id: string | null;
+  clickup_task_url: string | null;
 }
 
 interface Stats {
@@ -113,6 +115,38 @@ interface EvaluationDetail {
   responses: EvaluationDetailResponse[];
 }
 
+interface TaskDraft {
+  name: string;
+  description: string;
+  priority: number;
+  tags: string[];
+  conversation_record_id: string;
+  conversation_id: string;
+}
+
+interface ClickUpTaskStatus {
+  clickup_task_id: string;
+  clickup_task_url: string;
+  status: string;
+  status_color: string;
+  name: string;
+  priority: any;
+}
+
+const PRIORITY_LABELS: Record<number, string> = {
+  1: "Urgente",
+  2: "Alta",
+  3: "Normal",
+  4: "Baixa",
+};
+
+const PRIORITY_COLORS: Record<number, string> = {
+  1: "bg-red-100 text-red-800",
+  2: "bg-orange-100 text-orange-800",
+  3: "bg-blue-100 text-blue-800",
+  4: "bg-gray-100 text-gray-800",
+};
+
 // ─── Component ───────────────────────────────────────────────
 
 export default function CurationMetricsPage() {
@@ -137,6 +171,18 @@ export default function CurationMetricsPage() {
   const [selectedEvalDetail, setSelectedEvalDetail] =
     useState<EvaluationDetail | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
+
+  // ClickUp task state
+  const [taskDraft, setTaskDraft] = useState<TaskDraft | null>(null);
+  const [showTaskForm, setShowTaskForm] = useState(false);
+  const [generatingTask, setGeneratingTask] = useState(false);
+  const [creatingTask, setCreatingTask] = useState(false);
+  const [clickupTaskStatus, setClickupTaskStatus] =
+    useState<ClickUpTaskStatus | null>(null);
+  const [loadingTaskStatus, setLoadingTaskStatus] = useState(false);
+  const [taskStatusMap, setTaskStatusMap] = useState<
+    Record<string, ClickUpTaskStatus>
+  >({});
 
   // Filters
   const [searchTerm, setSearchTerm] = useState("");
@@ -173,6 +219,14 @@ export default function CurationMetricsPage() {
       setQuestionMetrics(d.questionMetrics || []);
       setOpenResponses(d.openResponses || []);
       setConversations(d.conversations || []);
+
+      // Fetch ClickUp task statuses for conversations that have tasks
+      const withTasks = (d.conversations || []).filter(
+        (c: ConversationWithEvals) => c.clickup_task_id,
+      );
+      if (withTasks.length > 0) {
+        fetchAllTaskStatuses(withTasks);
+      }
     } catch (err: any) {
       setError(err.response?.data?.error || "Erro ao carregar métricas");
     } finally {
@@ -180,9 +234,126 @@ export default function CurationMetricsPage() {
     }
   };
 
-  const openConversationModal = (conv: ConversationWithEvals) => {
+  const fetchAllTaskStatuses = async (convs: ConversationWithEvals[]) => {
+    const results: Record<string, ClickUpTaskStatus> = {};
+    await Promise.allSettled(
+      convs.map(async (c) => {
+        try {
+          const res = await api.get(`/curation/task-status/${c.id}`);
+          if (res.data.data) {
+            results[c.id] = res.data.data;
+          }
+        } catch (err) {
+          // ignore individual failures
+        }
+      }),
+    );
+    setTaskStatusMap(results);
+  };
+
+  const openConversationModal = async (conv: ConversationWithEvals) => {
     setSelectedConversation(conv);
     setSelectedEvalDetail(null);
+    setTaskDraft(null);
+    setShowTaskForm(false);
+    setClickupTaskStatus(null);
+
+    // Fetch ClickUp task status if task exists
+    if (conv.clickup_task_id) {
+      fetchTaskStatus(conv.id);
+    }
+  };
+
+  const fetchTaskStatus = async (conversationRecordId: string) => {
+    try {
+      setLoadingTaskStatus(true);
+      const res = await api.get(
+        `/curation/task-status/${conversationRecordId}`,
+      );
+      setClickupTaskStatus(res.data.data);
+    } catch (err: any) {
+      console.error("Failed to fetch task status:", err);
+    } finally {
+      setLoadingTaskStatus(false);
+    }
+  };
+
+  const handleGenerateTask = async (conversationRecordId: string) => {
+    try {
+      setGeneratingTask(true);
+      const res = await api.post(
+        `/curation/generate-task/${conversationRecordId}`,
+      );
+      setTaskDraft(res.data.data);
+      setShowTaskForm(true);
+    } catch (err: any) {
+      if (err.response?.status === 409) {
+        alert("Já existe uma task criada para esta conversa.");
+      } else {
+        alert(
+          err.response?.data?.error || "Erro ao gerar sugestão de task com IA",
+        );
+      }
+    } finally {
+      setGeneratingTask(false);
+    }
+  };
+
+  const handleCreateTask = async () => {
+    if (!taskDraft || !selectedConversation) return;
+    try {
+      setCreatingTask(true);
+      const res = await api.post(
+        `/curation/create-task/${selectedConversation.id}`,
+        {
+          name: taskDraft.name,
+          description: taskDraft.description,
+          priority: taskDraft.priority,
+          tags: taskDraft.tags,
+        },
+      );
+
+      const { clickup_task_id, clickup_task_url } = res.data.data;
+
+      // Update local state
+      setConversations((prev) =>
+        prev.map((c) =>
+          c.id === selectedConversation.id
+            ? { ...c, clickup_task_id, clickup_task_url }
+            : c,
+        ),
+      );
+      setSelectedConversation((prev) =>
+        prev ? { ...prev, clickup_task_id, clickup_task_url } : prev,
+      );
+
+      setShowTaskForm(false);
+      setTaskDraft(null);
+
+      // Fetch status for modal and listing
+      fetchTaskStatus(selectedConversation.id);
+      setTaskStatusMap((prev) => ({
+        ...prev,
+        [selectedConversation.id]: {
+          clickup_task_id: clickup_task_id,
+          clickup_task_url: clickup_task_url,
+          status: "to do",
+          status_color: "#d3d3d3",
+          name: taskDraft.name,
+          priority: taskDraft.priority,
+        },
+      }));
+
+      alert("Task criada com sucesso no ClickUp!");
+    } catch (err: any) {
+      if (err.response?.status === 409) {
+        alert("Já existe uma task criada para esta conversa.");
+      } else {
+        alert(err.response?.data?.error || "Erro ao criar task no ClickUp");
+      }
+    } finally {
+      setCreatingTask(false);
+    }
   };
 
   const fetchEvalDetail = async (sessionId: string) => {
@@ -630,6 +801,7 @@ export default function CurationMetricsPage() {
                     <th className="text-left py-3 px-4">Encerramento</th>
                     <th className="text-center py-3 px-4">Avaliações</th>
                     <th className="text-left py-3 px-4">Avaliadores</th>
+                    <th className="text-center py-3 px-4">ClickUp</th>
                     <th className="text-left py-3 px-4">Ações</th>
                   </tr>
                 </thead>
@@ -696,6 +868,45 @@ export default function CurationMetricsPage() {
                             </div>
                           )}
                         </div>
+                      </td>
+                      <td className="py-3 px-4 text-center">
+                        {conv.clickup_task_id ? (
+                          (() => {
+                            const ts = taskStatusMap[conv.id];
+                            return (
+                              <a
+                                href={conv.clickup_task_url || "#"}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium hover:opacity-80 transition-opacity"
+                                style={
+                                  ts
+                                    ? {
+                                        backgroundColor: `${ts.status_color}20`,
+                                        color: ts.status_color,
+                                      }
+                                    : undefined
+                                }
+                                title={
+                                  ts
+                                    ? `${ts.name} — ${ts.status}`
+                                    : "Abrir task no ClickUp"
+                                }
+                              >
+                                <span
+                                  className="inline-block w-2 h-2 rounded-full"
+                                  style={{
+                                    backgroundColor:
+                                      ts?.status_color || "#8b5cf6",
+                                  }}
+                                />
+                                {ts ? ts.status : "📋 Task"}
+                              </a>
+                            );
+                          })()
+                        ) : (
+                          <span className="text-gray-300 text-xs">—</span>
+                        )}
                       </td>
                       <td className="py-3 px-4">
                         <button
@@ -901,6 +1112,117 @@ export default function CurationMetricsPage() {
                   )}
                 </div>
 
+                {/* ClickUp Task Section */}
+                <div className="mb-6 border-t pt-6">
+                  <h3 className="text-lg font-semibold mb-3">
+                    🎫 ClickUp Task
+                  </h3>
+
+                  {loadingTaskStatus ? (
+                    <div className="text-sm text-gray-500">
+                      Carregando status da task...
+                    </div>
+                  ) : selectedConversation.clickup_task_id &&
+                    clickupTaskStatus ? (
+                    <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 space-y-2">
+                      <div className="flex items-center gap-3">
+                        <span
+                          className="inline-block w-3 h-3 rounded-full"
+                          style={{
+                            backgroundColor:
+                              clickupTaskStatus!.status_color || "#8b5cf6",
+                          }}
+                        />
+                        <span className="font-medium">
+                          {clickupTaskStatus!.name || "Task criada"}
+                        </span>
+                        <span className="text-xs text-gray-500">
+                          Status: <strong>{clickupTaskStatus!.status}</strong>
+                        </span>
+                        {clickupTaskStatus!.priority != null && (
+                          <span
+                            className={`text-xs px-2 py-0.5 rounded-full ${PRIORITY_COLORS[Number(clickupTaskStatus!.priority)] || "bg-gray-100 text-gray-700"}`}
+                          >
+                            {PRIORITY_LABELS[
+                              Number(clickupTaskStatus!.priority)
+                            ] || `P${clickupTaskStatus!.priority}`}
+                          </span>
+                        )}
+                      </div>
+                      {selectedConversation!.clickup_task_url && (
+                        <a
+                          href={
+                            selectedConversation!.clickup_task_url || undefined
+                          }
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-sm text-purple-700 hover:text-purple-900 font-medium"
+                        >
+                          Abrir no ClickUp →
+                        </a>
+                      )}
+                    </div>
+                  ) : selectedConversation!.clickup_task_id ? (
+                    <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                      <p className="text-sm text-purple-700">
+                        Task criada (ID: {selectedConversation!.clickup_task_id}
+                        )
+                      </p>
+                      {selectedConversation!.clickup_task_url && (
+                        <a
+                          href={
+                            selectedConversation!.clickup_task_url || undefined
+                          }
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm text-purple-700 hover:text-purple-900 font-medium"
+                        >
+                          Abrir no ClickUp →
+                        </a>
+                      )}
+                    </div>
+                  ) : selectedConversation!.evaluation_count > 0 ? (
+                    <button
+                      onClick={() =>
+                        handleGenerateTask(selectedConversation!.id)
+                      }
+                      disabled={generatingTask}
+                      className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 flex items-center gap-2"
+                    >
+                      {generatingTask ? (
+                        <>
+                          <svg
+                            className="animate-spin h-4 w-4"
+                            viewBox="0 0 24 24"
+                          >
+                            <circle
+                              className="opacity-25"
+                              cx="12"
+                              cy="12"
+                              r="10"
+                              stroke="currentColor"
+                              strokeWidth="4"
+                              fill="none"
+                            />
+                            <path
+                              className="opacity-75"
+                              fill="currentColor"
+                              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                            />
+                          </svg>
+                          Gerando rascunho com IA...
+                        </>
+                      ) : (
+                        "🎫 Criar Task no ClickUp"
+                      )}
+                    </button>
+                  ) : (
+                    <p className="text-sm text-gray-400">
+                      Avalie esta conversa primeiro para criar uma task.
+                    </p>
+                  )}
+                </div>
+
                 {/* Evaluation Detail Panel (inside modal) */}
                 {selectedEvalDetail && (
                   <div className="border-t pt-6">
@@ -970,6 +1292,163 @@ export default function CurationMetricsPage() {
                     className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
                   >
                     Fechar
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Task Creation Form Modal */}
+        {showTaskForm && taskDraft && (
+          <div
+            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4"
+            onClick={() => {
+              setShowTaskForm(false);
+              setTaskDraft(null);
+            }}
+          >
+            <div
+              className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="p-6">
+                <h2 className="text-xl font-bold mb-1">
+                  🎫 Criar Task no ClickUp
+                </h2>
+                <p className="text-sm text-gray-500 mb-6">
+                  Revise e edite os dados gerados pela IA antes de criar a task.
+                </p>
+
+                <div className="space-y-4">
+                  {/* Task Name */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Nome da Task
+                    </label>
+                    <input
+                      type="text"
+                      value={taskDraft.name}
+                      onChange={(e) =>
+                        setTaskDraft({ ...taskDraft, name: e.target.value })
+                      }
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                    />
+                  </div>
+
+                  {/* Description */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Descrição
+                    </label>
+                    <textarea
+                      value={taskDraft.description}
+                      onChange={(e) =>
+                        setTaskDraft({
+                          ...taskDraft,
+                          description: e.target.value,
+                        })
+                      }
+                      rows={8}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                    />
+                  </div>
+
+                  {/* Priority */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Prioridade
+                    </label>
+                    <select
+                      value={taskDraft.priority}
+                      onChange={(e) =>
+                        setTaskDraft({
+                          ...taskDraft,
+                          priority: Number(e.target.value),
+                        })
+                      }
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                    >
+                      <option value={1}>1 — Urgente</option>
+                      <option value={2}>2 — Alta</option>
+                      <option value={3}>3 — Normal</option>
+                      <option value={4}>4 — Baixa</option>
+                    </select>
+                  </div>
+
+                  {/* Tags */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Tags
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      {taskDraft.tags.map((tag: string, idx: number) => (
+                        <span
+                          key={idx}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 bg-gray-100 text-gray-700 rounded-full text-xs"
+                        >
+                          {tag}
+                          <button
+                            onClick={() =>
+                              setTaskDraft({
+                                ...taskDraft,
+                                tags: taskDraft.tags.filter(
+                                  (_: string, i: number) => i !== idx,
+                                ),
+                              })
+                            }
+                            className="text-gray-400 hover:text-red-500 ml-0.5"
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Form Actions */}
+                <div className="mt-6 flex justify-end gap-3">
+                  <button
+                    onClick={() => {
+                      setShowTaskForm(false);
+                      setTaskDraft(null);
+                    }}
+                    className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={handleCreateTask}
+                    disabled={creatingTask || !taskDraft.name.trim()}
+                    className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 flex items-center gap-2"
+                  >
+                    {creatingTask ? (
+                      <>
+                        <svg
+                          className="animate-spin h-4 w-4"
+                          viewBox="0 0 24 24"
+                        >
+                          <circle
+                            className="opacity-25"
+                            cx="12"
+                            cy="12"
+                            r="10"
+                            stroke="currentColor"
+                            strokeWidth="4"
+                            fill="none"
+                          />
+                          <path
+                            className="opacity-75"
+                            fill="currentColor"
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                          />
+                        </svg>
+                        Criando...
+                      </>
+                    ) : (
+                      "Criar Task"
+                    )}
                   </button>
                 </div>
               </div>

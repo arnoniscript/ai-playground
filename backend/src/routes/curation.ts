@@ -704,7 +704,7 @@ router.get(
     // 6. Get curation conversations with their evaluation data
     const { data: conversations } = await supabase
       .from('curation_conversations')
-      .select('id, conversation_id, agent_id, duration_seconds, call_datetime, transcript, audio_url, call_status, call_termination_reason, status, selected, max_passes, current_passes')
+      .select('id, conversation_id, agent_id, duration_seconds, call_datetime, transcript, audio_url, call_status, call_termination_reason, status, selected, max_passes, current_passes, clickup_task_id, clickup_task_url')
       .eq('playground_id', playgroundId)
       .eq('selected', true)
       .order('call_datetime', { ascending: false });
@@ -1010,6 +1010,304 @@ router.get(
       console.error('Error proxying audio:', err);
       res.status(500).json({ error: `Audio proxy error: ${err.message}` });
     }
+  }),
+);
+
+// ============================================================
+// ClickUp + OpenAI Integration
+// ============================================================
+
+/**
+ * POST /curation/generate-task/:conversationRecordId
+ * Use GPT 4.1 mini to generate a ClickUp task draft from conversation data.
+ * Returns suggested name, description, priority for the frontend form.
+ */
+router.post(
+  '/generate-task/:conversationRecordId',
+  authenticateToken,
+  asyncHandler(async (req, res) => {
+    const userRole = (req as any).user?.role;
+    if (userRole !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    const { conversationRecordId } = req.params;
+
+    // Get conversation record with playground name
+    const { data: record, error: recordError } = await supabase
+      .from('curation_conversations')
+      .select('*, playgrounds!inner(name)')
+      .eq('id', conversationRecordId)
+      .single();
+
+    if (recordError || !record) {
+      return res.status(404).json({ error: 'Conversation not found' });
+    }
+
+    if (record.clickup_task_id) {
+      return res.status(409).json({
+        error: 'Task already created for this conversation',
+        clickup_task_id: record.clickup_task_id,
+        clickup_task_url: record.clickup_task_url,
+      });
+    }
+
+    // Get evaluations for this conversation
+    const { data: curationEvals } = await supabase
+      .from('curation_evaluations')
+      .select('id, session_id, user_id, evaluated_at, users!inner(email, full_name)')
+      .eq('conversation_record_id', conversationRecordId);
+
+    // Get evaluation answers for each session
+    const evaluatorData: any[] = [];
+    for (const ce of (curationEvals || [])) {
+      const userInfo = Array.isArray(ce.users) ? ce.users[0] : ce.users;
+      const { data: answers } = await supabase
+        .from('evaluations')
+        .select('answer_text, answer_value, questions!inner(question_text, question_type, options)')
+        .eq('session_id', ce.session_id)
+        .eq('playground_id', record.playground_id);
+
+      const formattedAnswers = (answers || []).map((a: any) => {
+        const q = Array.isArray(a.questions) ? a.questions[0] : a.questions;
+        let answerDisplay = a.answer_text || a.answer_value;
+        if (q?.question_type === 'select' && q?.options && a.answer_value) {
+          const opt = q.options.find((o: any) => o.value === a.answer_value);
+          if (opt) answerDisplay = opt.label;
+        }
+        if (q?.question_type === 'boolean') {
+          answerDisplay = a.answer_value === 'true' ? 'Sim' : 'Não';
+        }
+        return { question: q?.question_text || '', answer: answerDisplay };
+      });
+
+      evaluatorData.push({
+        email: userInfo?.email || 'Desconhecido',
+        name: userInfo?.full_name || null,
+        answers: formattedAnswers,
+      });
+    }
+
+    // Format transcript as text
+    const transcriptText = (record.transcript || [])
+      .map((msg: any) => {
+        const role = (msg.role === 'agent' || msg.role === 'assistant') ? 'Agente' : 'Usuário';
+        return `${role}: ${msg.message || msg.text || msg.content || ''}`;
+      })
+      .join('\n');
+
+    const playgroundName = (record as any).playgrounds?.name || 'Playground';
+
+    // Build prompt for GPT
+    const prompt = `Você é um assistente que cria tasks no ClickUp baseado em dados de curadoria de conversas de agentes de voz.
+
+Dados da conversa:
+- Playground: ${playgroundName}
+- Conversation ID: ${record.conversation_id}
+- Data/Hora: ${record.call_datetime || 'N/A'}
+- Duração: ${record.duration_seconds ? Math.floor(record.duration_seconds / 60) + 'min ' + (record.duration_seconds % 60) + 's' : 'N/A'}
+- Status da chamada: ${record.call_status || 'N/A'}
+- Motivo do encerramento: ${record.call_termination_reason || 'N/A'}
+
+Transcrição:
+${transcriptText || 'Não disponível'}
+
+Avaliações dos curadores:
+${evaluatorData.map((ev, i) => {
+  return `Avaliador ${i + 1} (${ev.email}):\n${ev.answers.map((a: any) => `  - ${a.question}: ${a.answer}`).join('\n')}`;
+}).join('\n\n')}
+
+Com base nesses dados, gere uma task para o ClickUp:
+1. "name": O nome da task deve seguir o formato "[Curadoria] - " seguido de descrição de no máximo 5 palavras sobre o problema/demanda identificada.
+2. "description": A descrição deve ser em Markdown e conter:
+   - Resumo das demandas/problemas identificados pelos avaliadores
+   - Conversation ID: ${record.conversation_id}
+   - Playground ID: ${record.playground_id}
+   - Playground: ${playgroundName}
+   - Avaliadores (emails): ${evaluatorData.map(e => e.email).join(', ')}
+   - Data da conversa: ${record.call_datetime || 'N/A'}
+3. "priority": Um número de 1 a 4 (1=urgente, 2=alta, 3=normal, 4=baixa) baseado na gravidade dos problemas identificados.
+
+Responda APENAS com um JSON válido com os campos: name, description, priority. Sem texto adicional.`;
+
+    // Call OpenAI
+    const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${config.openai.apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4.1-mini',
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.4,
+        max_tokens: 1500,
+      }),
+    });
+
+    if (!openaiRes.ok) {
+      const body = await openaiRes.text();
+      console.error('OpenAI error:', body);
+      return res.status(500).json({ error: 'Failed to generate task with OpenAI' });
+    }
+
+    const openaiData: any = await openaiRes.json();
+    const content = openaiData.choices?.[0]?.message?.content || '';
+
+    let taskDraft;
+    try {
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      taskDraft = JSON.parse(jsonMatch ? jsonMatch[0] : content);
+    } catch (e) {
+      console.error('Failed to parse GPT response:', content);
+      return res.status(500).json({ error: 'Failed to parse GPT response', raw: content });
+    }
+
+    res.json({
+      data: {
+        name: taskDraft.name || '[Curadoria] - Task',
+        description: taskDraft.description || '',
+        priority: taskDraft.priority || 3,
+        tags: ['curadoria', 'ai.playground'],
+        conversation_record_id: conversationRecordId,
+        conversation_id: record.conversation_id,
+      },
+    });
+  }),
+);
+
+/**
+ * POST /curation/create-task/:conversationRecordId
+ * Create a task in ClickUp with the provided data.
+ * Body: { name, description, priority, tags }
+ */
+router.post(
+  '/create-task/:conversationRecordId',
+  authenticateToken,
+  asyncHandler(async (req, res) => {
+    const userRole = (req as any).user?.role;
+    if (userRole !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    const { conversationRecordId } = req.params;
+    const { name, description, priority, tags } = req.body;
+
+    // Check conversation exists and doesn't already have a task
+    const { data: record, error: recordError } = await supabase
+      .from('curation_conversations')
+      .select('id, clickup_task_id')
+      .eq('id', conversationRecordId)
+      .single();
+
+    if (recordError || !record) {
+      return res.status(404).json({ error: 'Conversation not found' });
+    }
+
+    if (record.clickup_task_id) {
+      return res.status(409).json({ error: 'Task already exists for this conversation', clickup_task_id: record.clickup_task_id });
+    }
+
+    // Create task in ClickUp
+    const clickupRes = await fetch(`${config.clickup.baseUrl}/list/${config.clickup.listId}/task`, {
+      method: 'POST',
+      headers: {
+        'Authorization': config.clickup.apiKey,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        name: name || '[Curadoria] - Task',
+        markdown_content: description || '',
+        priority: priority || null,
+        tags: tags || ['curadoria', 'ai.playground'],
+      }),
+    });
+
+    if (!clickupRes.ok) {
+      const body = await clickupRes.text();
+      console.error('ClickUp create error:', body);
+      return res.status(500).json({ error: 'Failed to create task in ClickUp' });
+    }
+
+    const clickupTask: any = await clickupRes.json();
+    const taskId = clickupTask.id;
+    const taskUrl = clickupTask.url;
+
+    // Save task ID and URL to conversation record
+    const { error: updateError } = await supabase
+      .from('curation_conversations')
+      .update({
+        clickup_task_id: taskId,
+        clickup_task_url: taskUrl,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', conversationRecordId);
+
+    if (updateError) {
+      console.error('Error saving clickup task ID:', updateError);
+    }
+
+    res.json({
+      data: {
+        clickup_task_id: taskId,
+        clickup_task_url: taskUrl,
+        task: clickupTask,
+      },
+    });
+  }),
+);
+
+/**
+ * GET /curation/task-status/:conversationRecordId
+ * Fetch current status of the ClickUp task linked to a conversation.
+ */
+router.get(
+  '/task-status/:conversationRecordId',
+  authenticateToken,
+  asyncHandler(async (req, res) => {
+    const { conversationRecordId } = req.params;
+
+    const { data: record, error: recordError } = await supabase
+      .from('curation_conversations')
+      .select('clickup_task_id, clickup_task_url')
+      .eq('id', conversationRecordId)
+      .single();
+
+    if (recordError || !record) {
+      return res.status(404).json({ error: 'Conversation not found' });
+    }
+
+    if (!record.clickup_task_id) {
+      return res.json({ data: null });
+    }
+
+    // Fetch task from ClickUp
+    const clickupRes = await fetch(`${config.clickup.baseUrl}/task/${record.clickup_task_id}`, {
+      headers: {
+        'Authorization': config.clickup.apiKey,
+      },
+    });
+
+    if (!clickupRes.ok) {
+      const body = await clickupRes.text();
+      console.error('ClickUp task fetch error:', body);
+      return res.status(500).json({ error: 'Failed to fetch task from ClickUp' });
+    }
+
+    const task: any = await clickupRes.json();
+
+    const priorityId = task.priority?.id ? Number(task.priority.id) : null;
+
+    res.json({
+      data: {
+        clickup_task_id: task.id,
+        clickup_task_url: task.url || record.clickup_task_url,
+        status: task.status?.status || 'unknown',
+        status_color: task.status?.color || '#d3d3d3',
+        name: task.name,
+        priority: priorityId,
+      },
+    });
   }),
 );
 

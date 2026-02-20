@@ -33,6 +33,14 @@ export const config = {
     callsEndpoint: process.env.ELEVENLABS_CALLS_ENDPOINT_TEMPLATE || '/v1/convai/conversations',
     callDetailEndpoint: process.env.ELEVENLABS_CALL_DETAIL_ENDPOINT_TEMPLATE || '/v1/convai/conversations/{conversation_id}',
   },
+  clickup: {
+    apiKey: process.env.CLICKUP_API_KEY || '',
+    listId: process.env.CLICKUP_LIST_ID || '901322921243',
+    baseUrl: 'https://api.clickup.com/api/v2',
+  },
+  openai: {
+    apiKey: process.env.OPEN_AI_API_KEY || '',
+  },
 };
 
 export function validateConfig() {
