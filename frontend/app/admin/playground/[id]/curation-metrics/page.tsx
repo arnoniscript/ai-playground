@@ -389,7 +389,7 @@ export default function CurationMetricsPage() {
   };
 
   const audioUrl = (conversationId: string) =>
-    `${API_URL}/curation/audio/${conversationId}?token=${token}`;
+    `${API_URL}curation/audio/${conversationId}?token=${token}`;
 
   // Filtered conversations
   const filteredConversations = conversations.filter((c) => {
