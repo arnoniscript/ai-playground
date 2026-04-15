@@ -1,4 +1,5 @@
 -- Fix get_parent_task_consolidation_data to use evaluations table instead of non-existent task_answers
+-- Also: filter evaluations by playground_id for safety, and use created_at DESC for deterministic DISTINCT ON
 
 CREATE OR REPLACE FUNCTION get_parent_task_consolidation_data(p_parent_task_id UUID)
 RETURNS TABLE (
@@ -60,7 +61,8 @@ BEGIN
                 FROM evaluations e
                 JOIN questions q ON q.id = e.question_id
                 WHERE e.session_id = pte.session_id
-                ORDER BY e.question_id, q.order_index
+                  AND e.playground_id = pt.playground_id
+                ORDER BY e.question_id, e.created_at DESC
               ) answers_data
             ) as answers
           FROM parent_task_evaluations pte

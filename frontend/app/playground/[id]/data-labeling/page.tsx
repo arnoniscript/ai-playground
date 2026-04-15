@@ -20,7 +20,6 @@ export default function DataLabelingEvaluationPage() {
   const [currentTask, setCurrentTask] = useState<NextParentTask | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingNextTask, setLoadingNextTask] = useState(false);
-  const [sessionId] = useState(uuidv4());
   const [answers, setAnswers] = useState<Record<string, any>>({});
   const [submitting, setSubmitting] = useState(false);
   const [noMoreTasks, setNoMoreTasks] = useState(false);
@@ -135,8 +134,12 @@ export default function DataLabelingEvaluationPage() {
     try {
       setSubmitting(true);
 
+      // Generate a unique session_id per task submission to avoid
+      // mixing answers from different tasks in the consolidation panel
+      const taskSessionId = uuidv4();
+
       const evaluationData = {
-        session_id: sessionId,
+        session_id: taskSessionId,
         parent_task_id: currentTask.parent_task_id,
         playground_id: playgroundId,
         time_spent_seconds: timeSpentRef.current,
@@ -158,7 +161,7 @@ export default function DataLabelingEvaluationPage() {
 
       await api.post("/data-labeling/record-evaluation", {
         parent_task_id: currentTask.parent_task_id,
-        session_id: sessionId,
+        session_id: taskSessionId,
       });
 
       timeSpentRef.current = 0;
