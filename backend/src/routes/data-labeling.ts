@@ -326,18 +326,42 @@ router.get(
       return res.status(403).json({ error: 'Admin access required' });
     }
 
-    const { data, error } = await supabase
-      .from('parent_tasks')
-      .select('*')
-      .eq('playground_id', playgroundId)
-      .order('created_at', { ascending: true });
+    // Supabase/PostgREST can cap results to 1000 rows unless range pagination is used.
+    // Fetch in chunks so admin consolidation can list every uploaded document.
+    const pageSize = 1000;
+    let from = 0;
+    const allTasks: ParentTask[] = [];
 
-    if (error) {
-      console.error('Error getting parent tasks:', error);
-      return res.status(500).json({ error: 'Failed to get parent tasks' });
+    while (true) {
+      const to = from + pageSize - 1;
+
+      const { data: batch, error } = await supabase
+        .from('parent_tasks')
+        .select('*')
+        .eq('playground_id', playgroundId)
+        .order('created_at', { ascending: true })
+        .order('id', { ascending: true })
+        .range(from, to);
+
+      if (error) {
+        console.error('Error getting parent tasks:', error);
+        return res.status(500).json({ error: 'Failed to get parent tasks' });
+      }
+
+      if (!batch || batch.length === 0) {
+        break;
+      }
+
+      allTasks.push(...batch);
+
+      if (batch.length < pageSize) {
+        break;
+      }
+
+      from += pageSize;
     }
 
-    res.json(data);
+    res.json(allTasks);
   })
 );
 
