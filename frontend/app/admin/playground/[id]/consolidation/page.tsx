@@ -54,13 +54,13 @@ export default function DataLabelingConsolidationPage() {
 
   // Filter state
   const [statusFilter, setStatusFilter] = useState<ParentTaskStatus | "all">(
-    "all"
+    "all",
   );
   const [searchQuery, setSearchQuery] = useState("");
 
   // Expanded answers state for open-ended questions
   const [expandedQuestions, setExpandedQuestions] = useState<Set<string>>(
-    new Set()
+    new Set(),
   );
   const [showIndividualEvaluations, setShowIndividualEvaluations] =
     useState(false);
@@ -114,7 +114,7 @@ export default function DataLabelingConsolidationPage() {
     // Collect ALL answers for this question from ALL evaluations
     const answers = taskDetails.evaluations
       .flatMap(
-        (e) => e.answers?.filter((a) => a.question_id === questionId) || []
+        (e) => e.answers?.filter((a) => a.question_id === questionId) || [],
       )
       .filter((a) => a?.answer);
 
@@ -129,7 +129,7 @@ export default function DataLabelingConsolidationPage() {
       });
       console.log(
         "All evaluation answers (null treated as false):",
-        allEvaluationAnswers
+        allEvaluationAnswers,
       );
 
       const trueCount = allEvaluationAnswers.filter((a) => a === "true").length;
@@ -163,7 +163,7 @@ export default function DataLabelingConsolidationPage() {
     return taskDetails.evaluations
       .map((evaluation) => {
         const answer = evaluation.answers?.find(
-          (a) => a.question_id === questionId
+          (a) => a.question_id === questionId,
         );
         if (answer?.answer) {
           return {
@@ -188,13 +188,13 @@ export default function DataLabelingConsolidationPage() {
 
       // Load parent tasks
       const tasksResponse = await api.get(
-        `/data-labeling/parent-tasks/${playgroundId}`
+        `/data-labeling/parent-tasks/${playgroundId}`,
       );
       setParentTasks(tasksResponse.data || []);
 
       // Load metrics
       const metricsResponse = await api.get(
-        `/data-labeling/metrics/${playgroundId}`
+        `/data-labeling/metrics/${playgroundId}`,
       );
       setMetrics(metricsResponse.data);
     } catch (error) {
@@ -236,7 +236,7 @@ export default function DataLabelingConsolidationPage() {
 
     if (
       !confirm(
-        "Deseja realmente desconsolidar esta task? Ela voltará ao status ativo e poderá ser reconsolidada."
+        "Deseja realmente desconsolidar esta task? Ela voltará ao status ativo e poderá ser reconsolidada.",
       )
     ) {
       return;
@@ -284,12 +284,12 @@ export default function DataLabelingConsolidationPage() {
         // Validate all questions have answers
         const allQuestions = getAllUniqueQuestions();
         const missingAnswers = allQuestions.filter(
-          (q) => !selectedAnswers[q.question_id]
+          (q) => !selectedAnswers[q.question_id],
         );
 
         if (missingAnswers.length > 0) {
           alert(
-            `Por favor, selecione ou crie respostas para todas as perguntas (${missingAnswers.length} faltando)`
+            `Por favor, selecione ou crie respostas para todas as perguntas (${missingAnswers.length} faltando)`,
           );
           return;
         }
@@ -405,7 +405,8 @@ export default function DataLabelingConsolidationPage() {
         {
           params: { format },
           responseType: format === "json" ? "json" : "blob",
-        }
+          timeout: 120000, // 2 min timeout for large datasets
+        },
       );
 
       if (format === "json") {
@@ -729,10 +730,10 @@ export default function DataLabelingConsolidationPage() {
                               {getAllUniqueQuestions().map((question, idx) => {
                                 const stats = calculateQuestionStats(
                                   question.question_id,
-                                  question.question_type
+                                  question.question_type,
                                 );
                                 const isExpanded = expandedQuestions.has(
-                                  question.question_id
+                                  question.question_id,
                                 );
 
                                 return (
@@ -747,8 +748,8 @@ export default function DataLabelingConsolidationPage() {
                                         {question.question_type === "boolean"
                                           ? "Booleano"
                                           : question.question_type === "select"
-                                          ? "Múltipla escolha"
-                                          : "Texto aberto"}
+                                            ? "Múltipla escolha"
+                                            : "Texto aberto"}
                                         )
                                       </span>
                                     </div>
@@ -767,7 +768,7 @@ export default function DataLabelingConsolidationPage() {
                                               <span className="text-green-600">
                                                 {stats.true.count} (
                                                 {stats.true.percentage.toFixed(
-                                                  1
+                                                  1,
                                                 )}
                                                 %)
                                               </span>
@@ -781,7 +782,7 @@ export default function DataLabelingConsolidationPage() {
                                               >
                                                 {stats.true.percentage > 10 &&
                                                   `${stats.true.percentage.toFixed(
-                                                    0
+                                                    0,
                                                   )}%`}
                                               </div>
                                             </div>
@@ -794,7 +795,7 @@ export default function DataLabelingConsolidationPage() {
                                               <span className="text-red-600">
                                                 {stats.false.count} (
                                                 {stats.false.percentage.toFixed(
-                                                  1
+                                                  1,
                                                 )}
                                                 %)
                                               </span>
@@ -808,7 +809,7 @@ export default function DataLabelingConsolidationPage() {
                                               >
                                                 {stats.false.percentage > 10 &&
                                                   `${stats.false.percentage.toFixed(
-                                                    0
+                                                    0,
                                                   )}%`}
                                               </div>
                                             </div>
@@ -844,7 +845,7 @@ export default function DataLabelingConsolidationPage() {
                                                 >
                                                   {option.percentage > 10 &&
                                                     `${option.percentage.toFixed(
-                                                      0
+                                                      0,
                                                     )}%`}
                                                 </div>
                                               </div>
@@ -864,7 +865,7 @@ export default function DataLabelingConsolidationPage() {
                                           <button
                                             onClick={() =>
                                               toggleExpandQuestion(
-                                                question.question_id
+                                                question.question_id,
                                               )
                                             }
                                             className="w-full text-left px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded flex items-center justify-between"
@@ -883,7 +884,7 @@ export default function DataLabelingConsolidationPage() {
                                               {stats.map(
                                                 (
                                                   item: any,
-                                                  itemIdx: number
+                                                  itemIdx: number,
                                                 ) => (
                                                   <div
                                                     key={itemIdx}
@@ -897,11 +898,11 @@ export default function DataLabelingConsolidationPage() {
                                                         item.user_email}{" "}
                                                       •{" "}
                                                       {formatDate(
-                                                        item.evaluated_at
+                                                        item.evaluated_at,
                                                       )}
                                                     </div>
                                                   </div>
-                                                )
+                                                ),
                                               )}
                                             </div>
                                           )}
@@ -968,12 +969,12 @@ export default function DataLabelingConsolidationPage() {
                                                   )}
                                                 </div>
                                               </div>
-                                            )
+                                            ),
                                           )}
                                         </div>
                                       )}
                                   </div>
-                                )
+                                ),
                               )}
                             </div>
                           )}
@@ -1162,7 +1163,7 @@ export default function DataLabelingConsolidationPage() {
                     {getAllUniqueQuestions().map((question, idx) => {
                       const questionStats = calculateQuestionStats(
                         question.question_id,
-                        question.question_type
+                        question.question_type,
                       );
                       const selected = selectedAnswers[question.question_id];
 
@@ -1184,7 +1185,7 @@ export default function DataLabelingConsolidationPage() {
                             {taskDetails.evaluations.map(
                               (evaluation, evalIdx) => {
                                 const answer = evaluation.answers?.find(
-                                  (a) => a.question_id === question.question_id
+                                  (a) => a.question_id === question.question_id,
                                 );
                                 if (!answer) return null;
 
@@ -1250,7 +1251,7 @@ export default function DataLabelingConsolidationPage() {
                                     </div>
                                   </label>
                                 );
-                              }
+                              },
                             )}
                           </div>
 
@@ -1275,8 +1276,8 @@ export default function DataLabelingConsolidationPage() {
                                         question.question_type === "boolean"
                                           ? "false"
                                           : question.question_type === "select"
-                                          ? ""
-                                          : undefined,
+                                            ? ""
+                                            : undefined,
                                       answer_text:
                                         question.question_type ===
                                         "input_string"
