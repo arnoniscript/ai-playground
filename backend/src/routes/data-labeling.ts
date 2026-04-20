@@ -707,52 +707,94 @@ router.get(
     console.log('Format:', format);
     console.log('Admin:', req.user!.email);
 
-    // Get consolidated parent tasks with their answers
-    const { data: consolidatedTasks, error: tasksError } = await supabase
-      .from('parent_tasks')
-      .select(`
-        id,
-        file_name,
-        file_type,
-        file_url,
-        consolidated_at,
-        consolidated_by,
-        admin_notes
-      `)
-      .eq('playground_id', playgroundId)
-      .eq('status', 'consolidated')
-      .order('consolidated_at', { ascending: true });
+    // Fetch ALL consolidated parent tasks with pagination (Supabase default limit is 1000)
+    const PAGE_SIZE = 1000;
+    let consolidatedTasks: any[] = [];
+    let offset = 0;
+    let hasMore = true;
 
-    if (tasksError) {
-      console.error('Error fetching consolidated tasks:', tasksError);
-      return res.status(500).json({ error: 'Failed to fetch consolidated tasks' });
+    while (hasMore) {
+      const { data: page, error: tasksError } = await supabase
+        .from('parent_tasks')
+        .select(`
+          id,
+          file_name,
+          file_type,
+          file_url,
+          consolidated_at,
+          consolidated_by,
+          admin_notes
+        `)
+        .eq('playground_id', playgroundId)
+        .eq('status', 'consolidated')
+        .order('consolidated_at', { ascending: true })
+        .range(offset, offset + PAGE_SIZE - 1);
+
+      if (tasksError) {
+        console.error('Error fetching consolidated tasks:', tasksError);
+        return res.status(500).json({ error: 'Failed to fetch consolidated tasks' });
+      }
+
+      if (page && page.length > 0) {
+        consolidatedTasks = consolidatedTasks.concat(page);
+        offset += page.length;
+        hasMore = page.length === PAGE_SIZE;
+      } else {
+        hasMore = false;
+      }
     }
 
-    if (!consolidatedTasks || consolidatedTasks.length === 0) {
+    if (consolidatedTasks.length === 0) {
       return res.status(404).json({ error: 'No consolidated tasks found' });
     }
 
-    // Get consolidated answers for these tasks
-    const taskIds = consolidatedTasks.map(t => t.id);
-    const { data: consolidatedAnswers, error: answersError } = await supabase
-      .from('consolidated_answers')
-      .select(`
-        parent_task_id,
-        question_id,
-        answer_value,
-        answer_text,
-        consolidated_at,
-        questions:question_id (
-          question_text,
-          question_type
-        )
-      `)
-      .in('parent_task_id', taskIds);
+    console.log(`Found ${consolidatedTasks.length} consolidated tasks`);
 
-    if (answersError) {
-      console.error('Error fetching consolidated answers:', answersError);
-      return res.status(500).json({ error: 'Failed to fetch consolidated answers' });
+    // Fetch consolidated answers in batches to avoid .in() URL length limits and row limits
+    // Each UUID is ~36 chars; PostgREST encodes .in() as URL query params with ~8KB limit
+    const BATCH_SIZE = 100;
+    const taskIds = consolidatedTasks.map(t => t.id);
+    let allConsolidatedAnswers: any[] = [];
+
+    for (let i = 0; i < taskIds.length; i += BATCH_SIZE) {
+      const batchIds = taskIds.slice(i, i + BATCH_SIZE);
+      let answersOffset = 0;
+      let answersHasMore = true;
+
+      while (answersHasMore) {
+        const { data: answersPage, error: answersError } = await supabase
+          .from('consolidated_answers')
+          .select(`
+            parent_task_id,
+            question_id,
+            answer_value,
+            answer_text,
+            consolidated_at,
+            questions:question_id (
+              question_text,
+              question_type
+            )
+          `)
+          .in('parent_task_id', batchIds)
+          .range(answersOffset, answersOffset + PAGE_SIZE - 1);
+
+        if (answersError) {
+          console.error('Error fetching consolidated answers:', answersError);
+          return res.status(500).json({ error: 'Failed to fetch consolidated answers' });
+        }
+
+        if (answersPage && answersPage.length > 0) {
+          allConsolidatedAnswers = allConsolidatedAnswers.concat(answersPage);
+          answersOffset += answersPage.length;
+          answersHasMore = answersPage.length === PAGE_SIZE;
+        } else {
+          answersHasMore = false;
+        }
+      }
     }
+
+    const consolidatedAnswers = allConsolidatedAnswers;
+    console.log(`Found ${consolidatedAnswers.length} consolidated answers`);
 
     // Build dataset structure
     const dataset = consolidatedTasks.map(task => {
