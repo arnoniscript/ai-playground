@@ -10,3 +10,4 @@ export { NotificationBanner, NotificationModal } from './notifications';
 export { default as QADashboardEarnings } from './qa-dashboard-earnings';
 export { default as BankAccountModal } from './bank-account-modal';
 export { default as BankAccountGuard } from './bank-account-guard';
+export { default as ProgressWidget } from './progress-widget';

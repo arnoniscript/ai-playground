@@ -6,6 +6,7 @@ import { AuthGuard } from "@/components/auth-guard";
 import { Layout } from "@/components/layout";
 import TimeTracker from "@/components/time-tracker";
 import { PdfViewer } from "@/components/pdf-viewer";
+import ProgressWidget from "@/components/progress-widget";
 import api from "@/lib/api";
 import { Playground, Question, NextParentTask } from "@/lib/types";
 import { v4 as uuidv4 } from "uuid";
@@ -29,6 +30,7 @@ export default function DataLabelingEvaluationPage() {
   const [isDesktop, setIsDesktop] = useState(true);
 
   const timeSpentRef = useRef<number>(0);
+  const progressWidgetRef = useRef<{ refresh: () => void }>(null);
 
   useEffect(() => {
     const mq = window.matchMedia("(min-width: 1024px)"); // lg
@@ -166,6 +168,9 @@ export default function DataLabelingEvaluationPage() {
 
       timeSpentRef.current = 0;
       await fetchNextTask();
+      
+      // Refresh progress widget to show updated numbers
+      progressWidgetRef.current?.refresh();
     } catch (error: any) {
       console.error("Error submitting evaluation:", error);
       alert(error.response?.data?.error || "Erro ao submeter avaliação");
@@ -289,6 +294,9 @@ export default function DataLabelingEvaluationPage() {
                   </p>
                 </div>
               )}
+
+              {/* Progress Widget */}
+              <ProgressWidget playgroundId={playgroundId} ref={progressWidgetRef} />
 
               {/* Time Tracker */}
               <TimeTracker

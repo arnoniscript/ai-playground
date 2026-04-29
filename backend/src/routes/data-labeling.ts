@@ -10,7 +10,8 @@ import {
   NextParentTask, 
   DataLabelingMetrics,
   ConsolidateParentTaskRequest,
-  ParentTaskWithEvaluations
+  ParentTaskWithEvaluations,
+  UserProgressResponse
 } from '../types.js';
 
 const router = Router();
@@ -894,6 +895,112 @@ router.get(
     }
 
     return res.status(400).json({ error: 'Invalid format. Use json, csv, or xlsx' });
+  })
+);
+
+// Get user progress for playground
+router.get(
+  '/user-progress/:playgroundId',
+  authenticateToken,
+  asyncHandler(async (req, res) => {
+    const { playgroundId } = req.params;
+    const userId = req.user!.id;
+
+    console.log('=== USER PROGRESS REQUEST ===');
+    console.log('Playground ID:', playgroundId);
+    console.log('User ID:', userId);
+
+    // Validate playground exists and is data_labeling type
+    const { data: playground, error: pgError } = await supabase
+      .from('playgrounds')
+      .select('id, type, name')
+      .eq('id', playgroundId)
+      .single();
+
+    if (pgError || !playground) {
+      return res.status(404).json({ error: 'Playground not found' });
+    }
+
+    if (playground.type !== 'data_labeling') {
+      return res.status(400).json({ error: 'Playground must be data_labeling type' });
+    }
+
+    // Get user's completed tasks count
+    const { count: userTasksCount, error: userTasksError } = await supabase
+      .from('parent_task_evaluations')
+      .select(`
+        id,
+        parent_tasks!inner (
+          playground_id
+        )
+      `, { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .eq('parent_tasks.playground_id', playgroundId);
+
+    if (userTasksError) {
+      console.error('Error getting user tasks count:', userTasksError);
+      return res.status(500).json({ error: 'Failed to get user progress' });
+    }
+
+    // Get total tasks available to user (excluding already completed)
+    // First, get the IDs of tasks this user has already completed
+    const { data: completedTaskIds, error: completedError } = await supabase
+      .from('parent_task_evaluations')
+      .select('parent_task_id')
+      .eq('user_id', userId);
+
+    if (completedError) {
+      console.error('Error getting completed task IDs:', completedError);
+      return res.status(500).json({ error: 'Failed to get completed tasks' });
+    }
+
+    // Extract just the IDs into an array
+    const completedIds = completedTaskIds?.map(item => item.parent_task_id) || [];
+    
+    console.log('User completed task IDs:', completedIds);
+
+    // Get all active/returned tasks for this playground
+    const { data: allTasks, error: allTasksError } = await supabase
+      .from('parent_tasks')
+      .select('id')
+      .eq('playground_id', playgroundId)
+      .in('status', ['active', 'returned_to_pipe']);
+
+    if (allTasksError) {
+      console.error('Error getting all tasks:', allTasksError);
+      return res.status(500).json({ error: 'Failed to get tasks' });
+    }
+
+    // Filter out completed tasks to get available tasks count
+    const availableTasks = allTasks?.filter(task => !completedIds.includes(task.id)).length || 0;
+    
+    console.log('Total tasks:', allTasks?.length || 0, 'Available tasks:', availableTasks);
+
+    // Get global metrics using existing RPC function
+    const { data: globalMetrics, error: metricsError } = await supabase
+      .rpc('get_data_labeling_metrics', {
+        p_playground_id: playgroundId
+      });
+
+    if (metricsError || !globalMetrics?.[0]) {
+      console.error('Error getting global metrics:', metricsError);
+      return res.status(500).json({ error: 'Failed to get global metrics' });
+    }
+
+    const metrics = globalMetrics[0];
+
+    const response: UserProgressResponse = {
+      playground_name: playground.name,
+      user_completed_tasks: userTasksCount || 0,
+      user_available_tasks: availableTasks || 0,
+      global_completion_percentage: metrics.completion_percentage,
+      global_total_tasks: metrics.total_parent_tasks,
+      global_completed_evaluations: metrics.completed_evaluations,
+      global_expected_evaluations: metrics.total_expected_evaluations
+    };
+
+    console.log('User progress response:', response);
+    res.json(response);
   })
 );
 
