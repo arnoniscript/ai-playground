@@ -464,6 +464,16 @@ export interface ConsolidateParentTaskRequest {
   extra_repetitions?: number;
 }
 
+export interface UserProgressResponse {
+  playground_name: string;
+  user_completed_tasks: number;
+  user_available_tasks: number;
+  global_completion_percentage: number;
+  global_total_tasks: number;
+  global_completed_evaluations: number;
+  global_expected_evaluations: number;
+}
+
 // Curation System Types
 
 export type CurationMode = 'continuous' | 'date_range';
